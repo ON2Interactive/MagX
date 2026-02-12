@@ -693,6 +693,26 @@ body {
   gap: 10px;
 }
 
+.tone-canvas {
+  width: 100%;
+  border: 1px solid #2f2f2f;
+  border-radius: 8px;
+  background: #101010;
+  display: block;
+}
+
+.tone-canvas-curves {
+  min-height: 176px;
+}
+
+.tone-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .control-row {
   display: grid;
   grid-template-columns: 1fr 1.3fr 34px;

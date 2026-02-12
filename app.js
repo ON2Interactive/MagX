@@ -118,6 +118,13 @@ const rotateLeftBtn = document.getElementById("rotateLeftBtn");
 const rotateRightBtn = document.getElementById("rotateRightBtn");
 const resetRotationBtn = document.getElementById("resetRotationBtn");
 const histogramCanvas = document.getElementById("histogramCanvas");
+const levelsChannelSelect = document.getElementById("levelsChannel");
+const curvesChannelSelect = document.getElementById("curvesChannel");
+const levelsCanvas = document.getElementById("levelsCanvas");
+const curvesCanvas = document.getElementById("curvesCanvas");
+const toneCurveFuncR = document.getElementById("toneCurveFuncR");
+const toneCurveFuncG = document.getElementById("toneCurveFuncG");
+const toneCurveFuncB = document.getElementById("toneCurveFuncB");
 
 const sliderIds = [
   "exposure",
@@ -138,6 +145,14 @@ const defaultAdjustments = {
   saturation: 0,
   temperature: 0,
   tint: 0,
+  levelsChannel: "rgb",
+  levelsBlack: 0,
+  levelsMid: 128,
+  levelsWhite: 255,
+  curvesChannel: "rgb",
+  curvesShadows: 0,
+  curvesMidtones: 128,
+  curvesHighlights: 255,
 };
 const MAX_BATCH_EDIT_COUNT = 4;
 const LAYER_TEXT_PREFIX = "text:";
@@ -149,6 +164,10 @@ const CREDIT_COSTS = {
   export: 10,
   generate: 10,
   edit: 10,
+};
+const toneDragState = {
+  levelsHandle: null,
+  curvesHandle: null,
 };
 
 const FALLBACK_FONT_OPTIONS = [
@@ -729,6 +748,100 @@ const isBwFilmLook = (profile) => profile.id.startsWith("bw-") || profile.id ===
 
 const getFilmLookStrengthT = (value) => clamp(value, 0, 100) / 100;
 
+const mapLevelsValue = (input, black, mid, white) => {
+  const min = clamp(black, 0, 254);
+  const max = clamp(white, min + 1, 255);
+  const gammaMid = clamp(mid, min + 1, max - 1);
+  const remapped = clamp((input - min) / (max - min), 0, 1);
+  const midNorm = clamp((gammaMid - min) / (max - min), 0.01, 0.99);
+  const gamma = Math.log(0.5) / Math.log(midNorm);
+  return clamp(Math.pow(remapped, gamma) * 255, 0, 255);
+};
+
+const mapCurveValue = (input, shadows, midtones, highlights) => {
+  const x = clamp(input, 0, 255);
+  const y0 = clamp(shadows, 0, 255);
+  const y1 = clamp(midtones, y0, 255);
+  const y2 = clamp(highlights, y1, 255);
+  if (x <= 128) {
+    return lerp(y0, y1, x / 128);
+  }
+  return lerp(y1, y2, (x - 128) / 127);
+};
+
+const buildToneLuts = (photo) => {
+  const adjustments = photo.adjustments;
+  const luts = {
+    red: new Array(256),
+    green: new Array(256),
+    blue: new Array(256),
+  };
+
+  const appliesLevels = (channel) => adjustments.levelsChannel === "rgb" || adjustments.levelsChannel === channel;
+  const appliesCurves = (channel) => adjustments.curvesChannel === "rgb" || adjustments.curvesChannel === channel;
+
+  for (let i = 0; i < 256; i += 1) {
+    let r = i;
+    let g = i;
+    let b = i;
+
+    if (appliesLevels("red")) r = mapLevelsValue(r, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
+    if (appliesLevels("green")) g = mapLevelsValue(g, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
+    if (appliesLevels("blue")) b = mapLevelsValue(b, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
+
+    if (appliesCurves("red")) r = mapCurveValue(r, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
+    if (appliesCurves("green")) g = mapCurveValue(g, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
+    if (appliesCurves("blue")) b = mapCurveValue(b, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
+
+    luts.red[i] = clamp(r, 0, 255);
+    luts.green[i] = clamp(g, 0, 255);
+    luts.blue[i] = clamp(b, 0, 255);
+  }
+
+  return luts;
+};
+
+const getToneLutKey = (a) =>
+  [
+    a.levelsChannel,
+    a.levelsBlack,
+    a.levelsMid,
+    a.levelsWhite,
+    a.curvesChannel,
+    a.curvesShadows,
+    a.curvesMidtones,
+    a.curvesHighlights,
+  ].join("|");
+
+const getToneLutsForPhoto = (photo) => {
+  if (!photo) return null;
+  const key = getToneLutKey(photo.adjustments);
+  if (photo._toneLuts && photo._toneLutKey === key) {
+    return photo._toneLuts;
+  }
+  const luts = buildToneLuts(photo);
+  photo._toneLutKey = key;
+  photo._toneLuts = luts;
+  return luts;
+};
+
+const lutToTableValues = (lut, sampleSize = 64) => {
+  const values = [];
+  for (let i = 0; i < sampleSize; i += 1) {
+    const idx = Math.round((i / (sampleSize - 1)) * 255);
+    values.push((lut[idx] / 255).toFixed(6));
+  }
+  return values.join(" ");
+};
+
+const applyToneFilterLut = (photo) => {
+  if (!toneCurveFuncR || !toneCurveFuncG || !toneCurveFuncB || !photo) return;
+  const luts = getToneLutsForPhoto(photo);
+  toneCurveFuncR.setAttribute("tableValues", lutToTableValues(luts.red));
+  toneCurveFuncG.setAttribute("tableValues", lutToTableValues(luts.green));
+  toneCurveFuncB.setAttribute("tableValues", lutToTableValues(luts.blue));
+};
+
 const buildBaseAdjustmentsFilter = (adjustments) => {
   const brightness = 100 + adjustments.exposure * 0.45;
   const contrast = 100 + adjustments.contrast;
@@ -754,9 +867,10 @@ const buildFilmLookFilter = (photo) => {
 };
 
 const buildCompositeFilter = (photo) => {
+  const tone = "url(#toneCurveFilter)";
   const base = buildBaseAdjustmentsFilter(photo.adjustments);
   const look = buildFilmLookFilter(photo);
-  return look ? `${base} ${look}` : base;
+  return look ? `${tone} ${base} ${look}` : `${tone} ${base}`;
 };
 
 const drawEmptyHistogram = () => {
@@ -765,6 +879,141 @@ const drawEmptyHistogram = () => {
   ctx.clearRect(0, 0, histogramCanvas.width, histogramCanvas.height);
   ctx.fillStyle = "#0f141a";
   ctx.fillRect(0, 0, histogramCanvas.width, histogramCanvas.height);
+};
+
+const getPhotoHistogramBins = (photo, { applyAdjustments = true, channel = "luma" } = {}) => {
+  if (!photo?.imgEl || !photo.imgEl.complete || photo.imgEl.naturalWidth === 0) {
+    return new Array(256).fill(0);
+  }
+  const sampleCanvas = document.createElement("canvas");
+  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+  if (!sampleCtx) return new Array(256).fill(0);
+
+  const maxSampleWidth = 320;
+  const ratio = photo.imgEl.naturalHeight / photo.imgEl.naturalWidth;
+  sampleCanvas.width = Math.min(maxSampleWidth, photo.imgEl.naturalWidth);
+  sampleCanvas.height = Math.max(1, Math.round(sampleCanvas.width * ratio));
+  sampleCtx.drawImage(photo.imgEl, 0, 0, sampleCanvas.width, sampleCanvas.height);
+
+  const { data } = sampleCtx.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height);
+  const bins = new Array(256).fill(0);
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+    if (applyAdjustments) {
+      [r, g, b] = applyAdjustmentMath(r, g, b, photo);
+    }
+    let value = 0;
+    if (channel === "red") value = r;
+    else if (channel === "green") value = g;
+    else if (channel === "blue") value = b;
+    else value = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    bins[Math.round(clamp(value, 0, 255))] += 1;
+  }
+  return bins;
+};
+
+const drawLevelsCanvas = (photo) => {
+  if (!levelsCanvas) return;
+  const ctx = levelsCanvas.getContext("2d");
+  if (!ctx) return;
+  const { width: w, height: h } = levelsCanvas;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "#2c2c2c";
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+  if (!photo) return;
+
+  const channel = photo.adjustments.levelsChannel || "rgb";
+  const bins = getPhotoHistogramBins(photo, { applyAdjustments: false, channel: channel === "rgb" ? "luma" : channel });
+  const peak = bins.reduce((m, v) => Math.max(m, v), 1);
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let x = 0; x < w; x += 1) {
+    const idx = Math.round((x / (w - 1)) * 255);
+    const y = h - (bins[idx] / peak) * (h - 18);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(170,170,170,0.35)";
+  ctx.fill();
+
+  const blackX = (photo.adjustments.levelsBlack / 255) * (w - 1);
+  const midX = (photo.adjustments.levelsMid / 255) * (w - 1);
+  const whiteX = (photo.adjustments.levelsWhite / 255) * (w - 1);
+  ctx.strokeStyle = "#f3f3f3";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(blackX, h - 14);
+  ctx.lineTo(midX, 10);
+  ctx.lineTo(whiteX, h - 14);
+  ctx.stroke();
+
+  [blackX, midX, whiteX].forEach((x) => {
+    ctx.beginPath();
+    ctx.arc(x, h - 10, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fill();
+  });
+};
+
+const drawCurvesCanvas = (photo) => {
+  if (!curvesCanvas) return;
+  const ctx = curvesCanvas.getContext("2d");
+  if (!ctx) return;
+  const { width: w, height: h } = curvesCanvas;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "#2c2c2c";
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+  for (let i = 1; i < 4; i += 1) {
+    const gx = (w / 4) * i;
+    const gy = (h / 4) * i;
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.beginPath();
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx, h);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(w, gy);
+    ctx.stroke();
+  }
+  if (!photo) return;
+
+  const a = photo.adjustments;
+  const points = [
+    { x: 0, y: h - (a.curvesShadows / 255) * h },
+    { x: w / 2, y: h - (a.curvesMidtones / 255) * h },
+    { x: w, y: h - (a.curvesHighlights / 255) * h },
+  ];
+
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  ctx.lineTo(points[1].x, points[1].y);
+  ctx.lineTo(points[2].x, points[2].y);
+  ctx.stroke();
+
+  points.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fill();
+  });
+};
+
+const renderTonePanels = () => {
+  const photo = getSelectedPhoto();
+  if (levelsChannelSelect) levelsChannelSelect.value = photo?.adjustments.levelsChannel || "rgb";
+  if (curvesChannelSelect) curvesChannelSelect.value = photo?.adjustments.curvesChannel || "rgb";
+  drawLevelsCanvas(photo);
+  drawCurvesCanvas(photo);
 };
 
 const applyAdjustmentMath = (r, g, b, photo) => {
@@ -822,6 +1071,11 @@ const applyAdjustmentMath = (r, g, b, photo) => {
     gg -= look.tint * t * 0.8;
   }
 
+  const luts = getToneLutsForPhoto(photo);
+  rr = luts.red[Math.round(clamp(rr, 0, 255))];
+  gg = luts.green[Math.round(clamp(gg, 0, 255))];
+  bb = luts.blue[Math.round(clamp(bb, 0, 255))];
+
   return [clamp(rr, 0, 255), clamp(gg, 0, 255), clamp(bb, 0, 255)];
 };
 
@@ -838,26 +1092,7 @@ const renderHistogram = () => {
     return;
   }
 
-  const sampleCanvas = document.createElement("canvas");
-  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
-  if (!sampleCtx) {
-    drawEmptyHistogram();
-    return;
-  }
-
-  const maxSampleWidth = 320;
-  const ratio = photo.imgEl.naturalHeight / photo.imgEl.naturalWidth;
-  sampleCanvas.width = Math.min(maxSampleWidth, photo.imgEl.naturalWidth);
-  sampleCanvas.height = Math.max(1, Math.round(sampleCanvas.width * ratio));
-  sampleCtx.drawImage(photo.imgEl, 0, 0, sampleCanvas.width, sampleCanvas.height);
-
-  const { data } = sampleCtx.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height);
-  const bins = new Array(256).fill(0);
-  for (let i = 0; i < data.length; i += 4) {
-    const [r, g, b] = applyAdjustmentMath(data[i], data[i + 1], data[i + 2], photo);
-    const luminance = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
-    bins[luminance] += 1;
-  }
+  const bins = getPhotoHistogramBins(photo, { applyAdjustments: true, channel: "luma" });
 
   const peak = bins.reduce((max, count) => Math.max(max, count), 1);
   ctx.clearRect(0, 0, histogramCanvas.width, histogramCanvas.height);
@@ -2484,6 +2719,9 @@ const applyAdjustmentsToPreview = () => {
   const previewSource = compareTarget || photo;
 
   mainPreview.src = previewSource.url;
+  if (!compareTarget) {
+    applyToneFilterLut(photo);
+  }
   mainPreview.style.filter = compareTarget ? "none" : buildCompositeFilter(photo);
   mainPreview.style.transform = `rotate(${previewSource.rotation}deg) scale(${state.zoom})`;
   overlayLayer.style.visibility = compareTarget ? "hidden" : "visible";
@@ -2497,6 +2735,7 @@ const applyAdjustmentsToPreview = () => {
 
   renderMetadata(photo);
   renderHistogram();
+  renderTonePanels();
   syncFilmLookControls();
   syncCompareControls();
   renderTextOverlays();
@@ -2914,6 +3153,125 @@ const attachWorkspacePanning = () => {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
+  });
+};
+
+const bindTonePanelEvents = () => {
+  const getLevelsHandleAtX = (photo, xPx, width) => {
+    const targets = [
+      { key: "black", value: photo.adjustments.levelsBlack },
+      { key: "mid", value: photo.adjustments.levelsMid },
+      { key: "white", value: photo.adjustments.levelsWhite },
+    ];
+    let best = null;
+    targets.forEach((item) => {
+      const px = (item.value / 255) * (width - 1);
+      const dist = Math.abs(px - xPx);
+      if (!best || dist < best.dist) best = { ...item, dist };
+    });
+    return best && best.dist <= 14 ? best.key : null;
+  };
+
+  const clampLevels = (a) => {
+    a.levelsBlack = clamp(Math.round(a.levelsBlack), 0, 253);
+    a.levelsMid = clamp(Math.round(a.levelsMid), a.levelsBlack + 1, 254);
+    a.levelsWhite = clamp(Math.round(a.levelsWhite), a.levelsMid + 1, 255);
+  };
+
+  const clampCurves = (a) => {
+    a.curvesShadows = clamp(Math.round(a.curvesShadows), 0, 254);
+    a.curvesMidtones = clamp(Math.round(a.curvesMidtones), a.curvesShadows, 255);
+    a.curvesHighlights = clamp(Math.round(a.curvesHighlights), a.curvesMidtones, 255);
+  };
+
+  levelsChannelSelect?.addEventListener("change", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    capturePhotoHistory(photo);
+    photo.adjustments.levelsChannel = String(event.target.value || "rgb");
+    applyAdjustmentsToPreview();
+  });
+
+  curvesChannelSelect?.addEventListener("change", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    capturePhotoHistory(photo);
+    photo.adjustments.curvesChannel = String(event.target.value || "rgb");
+    applyAdjustmentsToPreview();
+  });
+
+  levelsCanvas?.addEventListener("pointerdown", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    const rect = levelsCanvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const handle = getLevelsHandleAtX(photo, x, levelsCanvas.width);
+    if (!handle) return;
+    capturePhotoHistory(photo);
+    toneDragState.levelsHandle = handle;
+    levelsCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  levelsCanvas?.addEventListener("pointermove", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo || !toneDragState.levelsHandle) return;
+    const rect = levelsCanvas.getBoundingClientRect();
+    const x = clamp(event.clientX - rect.left, 0, rect.width);
+    const value = Math.round((x / rect.width) * 255);
+    if (toneDragState.levelsHandle === "black") photo.adjustments.levelsBlack = value;
+    if (toneDragState.levelsHandle === "mid") photo.adjustments.levelsMid = value;
+    if (toneDragState.levelsHandle === "white") photo.adjustments.levelsWhite = value;
+    clampLevels(photo.adjustments);
+    applyAdjustmentsToPreview();
+  });
+
+  levelsCanvas?.addEventListener("pointerup", () => {
+    toneDragState.levelsHandle = null;
+  });
+  levelsCanvas?.addEventListener("pointercancel", () => {
+    toneDragState.levelsHandle = null;
+  });
+
+  curvesCanvas?.addEventListener("pointerdown", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    const rect = curvesCanvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * curvesCanvas.width;
+    const y = ((event.clientY - rect.top) / rect.height) * curvesCanvas.height;
+    const points = [
+      { key: "curvesShadows", x: 0, y: curvesCanvas.height - (photo.adjustments.curvesShadows / 255) * curvesCanvas.height },
+      { key: "curvesMidtones", x: curvesCanvas.width / 2, y: curvesCanvas.height - (photo.adjustments.curvesMidtones / 255) * curvesCanvas.height },
+      { key: "curvesHighlights", x: curvesCanvas.width, y: curvesCanvas.height - (photo.adjustments.curvesHighlights / 255) * curvesCanvas.height },
+    ];
+    let best = null;
+    points.forEach((p) => {
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (!best || d < best.d) best = { key: p.key, d };
+    });
+    if (!best || best.d > 16) return;
+    capturePhotoHistory(photo);
+    toneDragState.curvesHandle = best.key;
+    curvesCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  curvesCanvas?.addEventListener("pointermove", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo || !toneDragState.curvesHandle) return;
+    const rect = curvesCanvas.getBoundingClientRect();
+    const y = clamp(event.clientY - rect.top, 0, rect.height);
+    const value = Math.round((1 - y / rect.height) * 255);
+    photo.adjustments[toneDragState.curvesHandle] = value;
+    clampCurves(photo.adjustments);
+    applyAdjustmentsToPreview();
+  });
+
+  curvesCanvas?.addEventListener("pointerup", () => {
+    toneDragState.curvesHandle = null;
+  });
+  curvesCanvas?.addEventListener("pointercancel", () => {
+    toneDragState.curvesHandle = null;
   });
 };
 
@@ -3340,12 +3698,14 @@ resetBtn.addEventListener("click", () => {
 
 setControlsEnabled(false);
 drawEmptyHistogram();
+renderTonePanels();
 loadCredits();
 updateZoomLabel();
 setFilmstripSize(state.filmstripHeight);
 attachFilmstripResize();
 attachWorkspacePanning();
 attachKeyboardNudging();
+bindTonePanelEvents();
 populateFilmLookOptions();
 syncFilmLookControls();
 populateSystemFonts();

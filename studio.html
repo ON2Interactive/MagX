@@ -182,6 +182,38 @@
           </details>
 
           <details class="inspector-section selection-panel" open>
+            <summary>Levels</summary>
+            <div class="section-body controls">
+              <div class="control-row text-control-row">
+                <label for="levelsChannel">Channel</label>
+                <select id="levelsChannel">
+                  <option value="rgb">RGB</option>
+                  <option value="red">Red</option>
+                  <option value="green">Green</option>
+                  <option value="blue">Blue</option>
+                </select>
+              </div>
+              <canvas id="levelsCanvas" class="tone-canvas" width="280" height="96"></canvas>
+            </div>
+          </details>
+
+          <details class="inspector-section selection-panel" open>
+            <summary>Curves</summary>
+            <div class="section-body controls">
+              <div class="control-row text-control-row">
+                <label for="curvesChannel">Channel</label>
+                <select id="curvesChannel">
+                  <option value="rgb">RGB</option>
+                  <option value="red">Red</option>
+                  <option value="green">Green</option>
+                  <option value="blue">Blue</option>
+                </select>
+              </div>
+              <canvas id="curvesCanvas" class="tone-canvas tone-canvas-curves" width="280" height="176"></canvas>
+            </div>
+          </details>
+
+          <details class="inspector-section selection-panel" open>
             <summary>Film Looks</summary>
             <div class="section-body controls">
               <div class="control-row text-control-row">
@@ -501,6 +533,18 @@
         <p id="editProcessingStatus">Applying AI edit...</p>
       </div>
     </div>
+
+    <svg class="tone-filter-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="toneCurveFilter" color-interpolation-filters="sRGB">
+          <feComponentTransfer>
+            <feFuncR id="toneCurveFuncR" type="table" tableValues="0 1"></feFuncR>
+            <feFuncG id="toneCurveFuncG" type="table" tableValues="0 1"></feFuncG>
+            <feFuncB id="toneCurveFuncB" type="table" tableValues="0 1"></feFuncB>
+          </feComponentTransfer>
+        </filter>
+      </defs>
+    </svg>
 
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="app.js"></script>
