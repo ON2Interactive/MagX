@@ -97,7 +97,9 @@ function isLikelyGoogleApiKey(value) {
 function normalizeGoogleApiKey(value) {
   const normalized = normalizeEnvValue(value);
   // Vercel copy/paste can accidentally include hidden newlines/spaces.
-  return normalized.replace(/\s+/g, "");
+  const noWhitespace = normalized.replace(/\s+/g, "");
+  // Keep only characters valid for Google API keys to avoid hidden unicode/control chars.
+  return noWhitespace.replace(/[^A-Za-z0-9_-]/g, "");
 }
 
 function getPublicBaseUrl(req) {
