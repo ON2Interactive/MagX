@@ -132,6 +132,34 @@ body {
   backdrop-filter: blur(0.2px);
 }
 
+.landing-hero-copy {
+  position: absolute;
+  z-index: 2;
+  left: clamp(20px, 5vw, 84px);
+  bottom: clamp(80px, 14vh, 170px);
+  max-width: min(860px, calc(100% - 40px));
+}
+
+.landing-hero-copy h1 {
+  margin-bottom: 8px;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.landing-hero-copy h2 {
+  margin-bottom: 16px;
+  line-height: 1.1;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.landing-hero-copy p {
+  margin: 0;
+  max-width: 640px;
+  font-size: 1rem;
+  color: var(--soft-white);
+}
+
 @media (max-width: 780px) {
   .landing-nav {
     height: 68px;
@@ -155,6 +183,17 @@ body {
 
   .landing-nav-links a {
     font-size: 0.84rem;
+  }
+
+  .landing-hero-copy {
+    left: 16px;
+    right: 16px;
+    bottom: 68px;
+    max-width: none;
+  }
+
+  .landing-hero-copy p {
+    max-width: none;
   }
 }
 
