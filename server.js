@@ -102,6 +102,18 @@ function normalizeGoogleApiKey(value) {
   return noWhitespace.replace(/[^A-Za-z0-9_-]/g, "");
 }
 
+function getImageEditSystemInstruction() {
+  const fromEnv = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_SYSTEM_INSTRUCTION);
+  if (fromEnv) return fromEnv;
+  return [
+    "You are a professional photo retoucher and colorist.",
+    "Apply only the user's explicit edit request to the provided image.",
+    "Preserve all other image content, composition, subject identity, camera angle, framing, background, and objects unless the user explicitly asks to change them.",
+    "Do not add, remove, or alter unrelated regions.",
+    "Keep results photorealistic, clean, and high quality.",
+  ].join(" ");
+}
+
 function getPublicBaseUrl(req) {
   const fromEnv = process.env.PEECHO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -220,6 +232,9 @@ async function handleNanoBananaEdit(req, res) {
       const base64Data = match[2];
       const maxAttempts = Math.max(1, Number(process.env.GOOGLE_IMAGE_EDIT_RETRIES || 4) + 1);
       const requestBody = JSON.stringify({
+        system_instruction: {
+          parts: [{ text: getImageEditSystemInstruction() }],
+        },
         contents: [
           {
             role: "user",
