@@ -125,12 +125,6 @@ const sliderIds = [
   "saturation",
   "temperature",
   "tint",
-  "levelsShadows",
-  "levelsMidtones",
-  "levelsHighlights",
-  "curveShadows",
-  "curveMidtones",
-  "curveHighlights",
 ];
 
 const toolButtons = {
@@ -144,12 +138,6 @@ const defaultAdjustments = {
   saturation: 0,
   temperature: 0,
   tint: 0,
-  levelsShadows: 0,
-  levelsMidtones: 0,
-  levelsHighlights: 0,
-  curveShadows: 0,
-  curveMidtones: 0,
-  curveHighlights: 0,
 };
 const MAX_BATCH_EDIT_COUNT = 4;
 const LAYER_TEXT_PREFIX = "text:";
@@ -742,47 +730,13 @@ const isBwFilmLook = (profile) => profile.id.startsWith("bw-") || profile.id ===
 const getFilmLookStrengthT = (value) => clamp(value, 0, 100) / 100;
 
 const buildBaseAdjustmentsFilter = (adjustments) => {
-  const levelBrightness = adjustments.levelsMidtones * 0.2;
-  const levelContrast = (adjustments.levelsHighlights - adjustments.levelsShadows) * 0.22;
-  const curveBrightness = adjustments.curveMidtones * 0.16;
-  const curveContrast = (adjustments.curveHighlights - adjustments.curveShadows) * 0.28;
-  const brightness = 100 + adjustments.exposure * 0.45 + levelBrightness + curveBrightness;
-  const contrast = 100 + adjustments.contrast + levelContrast + curveContrast;
+  const brightness = 100 + adjustments.exposure * 0.45;
+  const contrast = 100 + adjustments.contrast;
   const saturation = 100 + adjustments.saturation;
   const hueRotate = adjustments.tint * 0.35;
   const sepia = Math.max(0, adjustments.temperature) * 0.35;
 
   return `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) hue-rotate(${hueRotate}deg) sepia(${sepia}%)`;
-};
-
-const applyLevelsAndCurvesToChannel = (channel, adjustments) => {
-  let x = clamp(channel, 0, 255) / 255;
-
-  const levelsShadows = clamp(adjustments.levelsShadows, -100, 100) / 100;
-  const levelsMidtones = clamp(adjustments.levelsMidtones, -100, 100) / 100;
-  const levelsHighlights = clamp(adjustments.levelsHighlights, -100, 100) / 100;
-  const curveShadows = clamp(adjustments.curveShadows, -100, 100) / 100;
-  const curveMidtones = clamp(adjustments.curveMidtones, -100, 100) / 100;
-  const curveHighlights = clamp(adjustments.curveHighlights, -100, 100) / 100;
-
-  // Levels approximation: shift black/white points and remap tonal range.
-  const blackPoint = clamp(0.02 + levelsShadows * 0.2, 0, 0.45);
-  const whitePoint = clamp(0.98 - levelsHighlights * 0.2, 0.55, 1);
-  const remapped = (x - blackPoint) / Math.max(0.001, whitePoint - blackPoint);
-  x = clamp(remapped, 0, 1);
-
-  // Midtone level behaves like gamma with center-preserving response.
-  const gamma = clamp(1 - levelsMidtones * 0.6, 0.4, 1.8);
-  x = Math.pow(x, gamma);
-
-  // Curves approximation: independent shadow/highlight shaping + midtone boost/cut.
-  const shadowWeight = (1 - x) * (1 - x);
-  const highlightWeight = x * x;
-  x += (-curveShadows * 0.18) * shadowWeight;
-  x += (curveHighlights * 0.18) * highlightWeight;
-  x += curveMidtones * 0.12 * (1 - Math.abs(2 * x - 1));
-
-  return clamp(x * 255, 0, 255);
 };
 
 const buildFilmLookFilter = (photo) => {
@@ -843,10 +797,6 @@ const applyAdjustmentMath = (r, g, b, photo) => {
   gg -= 28 * tint;
   rr += 14 * tint;
   bb += 14 * tint;
-
-  rr = applyLevelsAndCurvesToChannel(rr, adjustments);
-  gg = applyLevelsAndCurvesToChannel(gg, adjustments);
-  bb = applyLevelsAndCurvesToChannel(bb, adjustments);
 
   const look = getFilmLookProfile(photo.filmLookId);
   const t = getFilmLookStrengthT(photo.filmLookStrength);

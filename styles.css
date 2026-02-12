@@ -693,14 +693,6 @@ body {
   gap: 10px;
 }
 
-.control-group-title {
-  margin: 6px 0 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8d8d8d;
-}
-
 .control-row {
   display: grid;
   grid-template-columns: 1fr 1.3fr 34px;
