@@ -81,9 +81,14 @@ function isValidHttpUrl(value) {
 
 function buildGoogleGenerateEndpoint(model, apiKey, configuredEndpoint) {
   if (isValidHttpUrl(configuredEndpoint)) return configuredEndpoint;
-  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-    model
-  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+}
+
+function normalizeModelName(value) {
+  const normalized = normalizeEnvValue(value);
+  if (!normalized) return "nano-banana-pro-preview";
+  if (!/^[a-zA-Z0-9._-]+$/.test(normalized)) return "nano-banana-pro-preview";
+  return normalized;
 }
 
 function getPublicBaseUrl(req) {
@@ -194,7 +199,7 @@ async function handleNanoBananaEdit(req, res) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
+      const model = normalizeModelName(process.env.GOOGLE_IMAGE_EDIT_MODEL);
       const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
       const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
 
@@ -223,7 +228,10 @@ async function handleNanoBananaEdit(req, res) {
         try {
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": googleApiKey,
+            },
             body: requestBody,
           });
 
@@ -303,7 +311,7 @@ async function handleNanoBananaGenerate(req, res) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
+      const model = normalizeModelName(process.env.GOOGLE_IMAGE_EDIT_MODEL);
       const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
       const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
 
@@ -344,7 +352,10 @@ async function handleNanoBananaGenerate(req, res) {
         try {
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": googleApiKey,
+            },
             body: requestBody,
           });
 
