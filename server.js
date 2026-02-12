@@ -69,6 +69,23 @@ function normalizeEnvValue(value) {
   return trimmed;
 }
 
+function isValidHttpUrl(value) {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function buildGoogleGenerateEndpoint(model, apiKey, configuredEndpoint) {
+  if (isValidHttpUrl(configuredEndpoint)) return configuredEndpoint;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    model
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+}
+
 function getPublicBaseUrl(req) {
   const fromEnv = process.env.PEECHO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -179,11 +196,7 @@ async function handleNanoBananaEdit(req, res) {
 
       const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
       const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
-      const endpoint =
-        configuredEndpoint ||
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-          model
-        )}:generateContent?key=${encodeURIComponent(googleApiKey)}`;
+      const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
 
       const mimeType = match[1] || "image/png";
       const base64Data = match[2];
@@ -292,11 +305,7 @@ async function handleNanoBananaGenerate(req, res) {
 
       const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
       const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
-      const endpoint =
-        configuredEndpoint ||
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-          model
-        )}:generateContent?key=${encodeURIComponent(googleApiKey)}`;
+      const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
 
       const outputHints = [];
       if (resolution) outputHints.push(`target resolution ${resolution}`);
