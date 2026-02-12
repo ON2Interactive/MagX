@@ -83,9 +83,9 @@ body {
   position: relative;
   min-height: 960px;
   background:
-    radial-gradient(120% 82% at 73% 6%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 26%, rgba(0, 0, 0, 0.96) 47%),
-    radial-gradient(84% 58% at 8% 36%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.04) 34%, rgba(0, 0, 0, 0.97) 59%),
-    radial-gradient(88% 66% at 31% 98%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.04) 33%, rgba(0, 0, 0, 0.98) 61%),
+    radial-gradient(116% 80% at 50% 6%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 26%, rgba(0, 0, 0, 0.96) 49%),
+    radial-gradient(102% 60% at 18% 42%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.04) 31%, rgba(0, 0, 0, 0.97) 56%),
+    radial-gradient(104% 67% at 47% 95%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 32%, rgba(0, 0, 0, 0.98) 59%),
     linear-gradient(170deg, #0f1014 0%, #07080b 42%, #050607 100%);
   overflow: hidden;
 }
@@ -98,30 +98,6 @@ body {
   backdrop-filter: blur(0.2px);
 }
 
-.landing-wordmark {
-  position: absolute;
-  right: clamp(30px, 6vw, 120px);
-  bottom: clamp(70px, 11vh, 145px);
-  z-index: 2;
-  color: #fff;
-  text-align: right;
-  line-height: 0.86;
-}
-
-.landing-wordmark span {
-  display: block;
-  font-size: clamp(2.1rem, 4vw, 4.2rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.landing-wordmark strong {
-  display: block;
-  font-size: clamp(4.5rem, 10vw, 10rem);
-  font-weight: 760;
-  letter-spacing: -0.04em;
-}
-
 @media (max-width: 780px) {
   .landing-nav {
     height: 68px;
@@ -131,9 +107,9 @@ body {
   .landing-hero {
     min-height: 960px;
     background:
-      radial-gradient(170% 80% at 74% 5%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 20%, rgba(0, 0, 0, 0.95) 43%),
-      radial-gradient(120% 58% at 7% 36%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.04) 24%, rgba(0, 0, 0, 0.96) 45%),
-      radial-gradient(130% 70% at 35% 100%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 28%, rgba(0, 0, 0, 0.97) 48%),
+      radial-gradient(160% 80% at 52% 4%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 22%, rgba(0, 0, 0, 0.95) 45%),
+      radial-gradient(128% 58% at 12% 42%, rgba(255, 255, 255, 0.27) 0%, rgba(255, 255, 255, 0.04) 26%, rgba(0, 0, 0, 0.96) 48%),
+      radial-gradient(134% 72% at 44% 99%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 30%, rgba(0, 0, 0, 0.97) 50%),
       linear-gradient(170deg, #0f1014 0%, #07080b 45%, #050607 100%);
   }
 
