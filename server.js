@@ -57,6 +57,18 @@ function sendJson(res, statusCode, payload) {
   res.end(body);
 }
 
+function normalizeEnvValue(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function getPublicBaseUrl(req) {
   const fromEnv = process.env.PEECHO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -160,15 +172,18 @@ async function handleNanoBananaEdit(req, res) {
         return sendJson(res, 400, { error: "Invalid imageDataUrl." });
       }
 
-      const googleApiKey = (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "").trim();
+      const googleApiKey = normalizeEnvValue(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "nano-banana-pro-preview";
+      const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
+      const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
       const endpoint =
-        process.env.GOOGLE_IMAGE_EDIT_ENDPOINT ||
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
+        configuredEndpoint ||
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          model
+        )}:generateContent?key=${encodeURIComponent(googleApiKey)}`;
 
       const mimeType = match[1] || "image/png";
       const base64Data = match[2];
@@ -270,15 +285,18 @@ async function handleNanoBananaGenerate(req, res) {
         return sendJson(res, 400, { error: "Missing prompt." });
       }
 
-      const googleApiKey = (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "").trim();
+      const googleApiKey = normalizeEnvValue(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "nano-banana-pro-preview";
+      const model = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_MODEL) || "nano-banana-pro-preview";
+      const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
       const endpoint =
-        process.env.GOOGLE_IMAGE_EDIT_ENDPOINT ||
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
+        configuredEndpoint ||
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          model
+        )}:generateContent?key=${encodeURIComponent(googleApiKey)}`;
 
       const outputHints = [];
       if (resolution) outputHints.push(`target resolution ${resolution}`);
