@@ -94,6 +94,12 @@ function isLikelyGoogleApiKey(value) {
   return /^AIza[0-9A-Za-z_-]{20,}$/.test(value || "");
 }
 
+function normalizeGoogleApiKey(value) {
+  const normalized = normalizeEnvValue(value);
+  // Vercel copy/paste can accidentally include hidden newlines/spaces.
+  return normalized.replace(/\s+/g, "");
+}
+
 function getPublicBaseUrl(req) {
   const fromEnv = process.env.PEECHO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -197,7 +203,7 @@ async function handleNanoBananaEdit(req, res) {
         return sendJson(res, 400, { error: "Invalid imageDataUrl." });
       }
 
-      const googleApiKey = normalizeEnvValue(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
+      const googleApiKey = normalizeGoogleApiKey(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
@@ -311,7 +317,7 @@ async function handleNanoBananaGenerate(req, res) {
         return sendJson(res, 400, { error: "Missing prompt." });
       }
 
-      const googleApiKey = normalizeEnvValue(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
+      const googleApiKey = normalizeGoogleApiKey(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
