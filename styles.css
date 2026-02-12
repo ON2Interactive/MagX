@@ -135,9 +135,11 @@ body {
 .landing-hero-copy {
   position: absolute;
   z-index: 2;
-  left: clamp(20px, 5vw, 84px);
-  bottom: clamp(80px, 14vh, 170px);
-  max-width: min(860px, calc(100% - 40px));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, calc(100% - 40px));
+  text-align: center;
 }
 
 .landing-hero-copy h1 {
@@ -186,10 +188,7 @@ body {
   }
 
   .landing-hero-copy {
-    left: 16px;
-    right: 16px;
-    bottom: 68px;
-    max-width: none;
+    width: calc(100% - 32px);
   }
 
   .landing-hero-copy p {
