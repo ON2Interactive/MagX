@@ -556,7 +556,8 @@ function handlePeechoFramedOfferings(_req, res) {
 }
 
 function serveStatic(req, res) {
-  const reqPath = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
+  const rawPath = decodeURIComponent(req.url.split("?")[0] || "/");
+  const reqPath = rawPath === "/" ? "/index.html" : rawPath === "/studio" ? "/studio.html" : rawPath;
   const safePath = path.normalize(path.join(ROOT, reqPath));
   if (!safePath.startsWith(ROOT)) {
     res.writeHead(403);
