@@ -165,7 +165,7 @@ async function handleNanoBananaEdit(req, res) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "gemini-2.5-flash-image-preview";
+      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "nano-banana-pro-preview";
       const endpoint =
         process.env.GOOGLE_IMAGE_EDIT_ENDPOINT ||
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
@@ -275,7 +275,7 @@ async function handleNanoBananaGenerate(req, res) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
-      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "gemini-2.5-flash-image-preview";
+      const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "nano-banana-pro-preview";
       const endpoint =
         process.env.GOOGLE_IMAGE_EDIT_ENDPOINT ||
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
