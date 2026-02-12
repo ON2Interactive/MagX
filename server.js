@@ -160,9 +160,9 @@ async function handleNanoBananaEdit(req, res) {
         return sendJson(res, 400, { error: "Invalid imageDataUrl." });
       }
 
-      const googleApiKey = process.env.GOOGLE_API_KEY;
+      const googleApiKey = (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "").trim();
       if (!googleApiKey) {
-        return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY in .env." });
+        return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
       const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "gemini-2.5-flash-image-preview";
@@ -270,9 +270,9 @@ async function handleNanoBananaGenerate(req, res) {
         return sendJson(res, 400, { error: "Missing prompt." });
       }
 
-      const googleApiKey = process.env.GOOGLE_API_KEY;
+      const googleApiKey = (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "").trim();
       if (!googleApiKey) {
-        return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY in .env." });
+        return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
 
       const model = process.env.GOOGLE_IMAGE_EDIT_MODEL || "gemini-2.5-flash-image-preview";
