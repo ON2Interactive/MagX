@@ -79,8 +79,7 @@ function isValidHttpUrl(value) {
   }
 }
 
-function buildGoogleGenerateEndpoint(model, apiKey, configuredEndpoint) {
-  if (isValidHttpUrl(configuredEndpoint)) return configuredEndpoint;
+function buildGoogleGenerateEndpoint(model) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 }
 
@@ -89,6 +88,10 @@ function normalizeModelName(value) {
   if (!normalized) return "nano-banana-pro-preview";
   if (!/^[a-zA-Z0-9._-]+$/.test(normalized)) return "nano-banana-pro-preview";
   return normalized;
+}
+
+function isLikelyGoogleApiKey(value) {
+  return /^AIza[0-9A-Za-z_-]{20,}$/.test(value || "");
 }
 
 function getPublicBaseUrl(req) {
@@ -198,10 +201,12 @@ async function handleNanoBananaEdit(req, res) {
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
+      if (!isLikelyGoogleApiKey(googleApiKey)) {
+        return sendJson(res, 500, { error: "Invalid Google API key format in environment." });
+      }
 
       const model = normalizeModelName(process.env.GOOGLE_IMAGE_EDIT_MODEL);
-      const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
-      const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
+      const endpoint = buildGoogleGenerateEndpoint(model);
 
       const mimeType = match[1] || "image/png";
       const base64Data = match[2];
@@ -310,10 +315,12 @@ async function handleNanoBananaGenerate(req, res) {
       if (!googleApiKey) {
         return sendJson(res, 500, { error: "Server missing GOOGLE_API_KEY or GEMINI_API_KEY in environment." });
       }
+      if (!isLikelyGoogleApiKey(googleApiKey)) {
+        return sendJson(res, 500, { error: "Invalid Google API key format in environment." });
+      }
 
       const model = normalizeModelName(process.env.GOOGLE_IMAGE_EDIT_MODEL);
-      const configuredEndpoint = normalizeEnvValue(process.env.GOOGLE_IMAGE_EDIT_ENDPOINT);
-      const endpoint = buildGoogleGenerateEndpoint(model, googleApiKey, configuredEndpoint);
+      const endpoint = buildGoogleGenerateEndpoint(model);
 
       const outputHints = [];
       if (resolution) outputHints.push(`target resolution ${resolution}`);
