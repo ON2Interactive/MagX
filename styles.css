@@ -705,6 +705,17 @@ body {
   min-height: 176px;
 }
 
+.tone-readout {
+  font-size: 0.76rem;
+  color: #a9a9a9;
+  letter-spacing: 0.01em;
+}
+
+.tone-help {
+  font-size: 0.74rem;
+  color: #919191;
+}
+
 .tone-filter-defs {
   position: absolute;
   width: 0;

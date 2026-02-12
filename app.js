@@ -122,6 +122,9 @@ const levelsChannelSelect = document.getElementById("levelsChannel");
 const curvesChannelSelect = document.getElementById("curvesChannel");
 const levelsCanvas = document.getElementById("levelsCanvas");
 const curvesCanvas = document.getElementById("curvesCanvas");
+const levelsReadout = document.getElementById("levelsReadout");
+const levelsResetBtn = document.getElementById("levelsResetBtn");
+const curvesResetBtn = document.getElementById("curvesResetBtn");
 const toneCurveFuncR = document.getElementById("toneCurveFuncR");
 const toneCurveFuncG = document.getElementById("toneCurveFuncG");
 const toneCurveFuncB = document.getElementById("toneCurveFuncB");
@@ -146,14 +149,21 @@ const defaultAdjustments = {
   temperature: 0,
   tint: 0,
   levelsChannel: "rgb",
-  levelsBlack: 0,
-  levelsMid: 128,
-  levelsWhite: 255,
+  levelsByChannel: {
+    rgb: { black: 0, mid: 128, white: 255 },
+    red: { black: 0, mid: 128, white: 255 },
+    green: { black: 0, mid: 128, white: 255 },
+    blue: { black: 0, mid: 128, white: 255 },
+  },
   curvesChannel: "rgb",
-  curvesShadows: 0,
-  curvesMidtones: 128,
-  curvesHighlights: 255,
+  curvesByChannel: {
+    rgb: [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }],
+    red: [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }],
+    green: [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }],
+    blue: [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }],
+  },
 };
+const TONE_CHANNELS = ["rgb", "red", "green", "blue"];
 const MAX_BATCH_EDIT_COUNT = 4;
 const LAYER_TEXT_PREFIX = "text:";
 const LAYER_SHAPE_PREFIX = "shape:";
@@ -167,7 +177,7 @@ const CREDIT_COSTS = {
 };
 const toneDragState = {
   levelsHandle: null,
-  curvesHandle: null,
+  curvesHandleIndex: null,
 };
 
 const FALLBACK_FONT_OPTIONS = [
@@ -393,7 +403,7 @@ const reorderLayer = (sourceKey, targetKey) => {
 
 const clonePhotoSnapshot = (snapshot) => JSON.parse(JSON.stringify(snapshot));
 const getPhotoSnapshot = (photo) => ({
-  adjustments: { ...photo.adjustments },
+  adjustments: cloneAdjustments(photo.adjustments),
   rotation: photo.rotation,
   filmLookId: photo.filmLookId,
   filmLookStrength: photo.filmLookStrength,
@@ -507,7 +517,7 @@ const capturePhotoHistory = (photo = getSelectedPhoto()) => {
 };
 const applyPhotoSnapshot = (photo, snapshot) => {
   if (!photo || !snapshot) return;
-  photo.adjustments = { ...defaultAdjustments, ...(snapshot.adjustments || {}) };
+  photo.adjustments = cloneAdjustments(snapshot.adjustments || defaultAdjustments);
   photo.rotation = Number(snapshot.rotation ?? 0);
   photo.filmLookId = snapshot.filmLookId || "none";
   photo.filmLookStrength = Number(snapshot.filmLookStrength ?? 100);
@@ -748,6 +758,77 @@ const isBwFilmLook = (profile) => profile.id.startsWith("bw-") || profile.id ===
 
 const getFilmLookStrengthT = (value) => clamp(value, 0, 100) / 100;
 
+const cloneAdjustments = (adjustments) => {
+  const base = { ...defaultAdjustments, ...(adjustments || {}) };
+  const clone = {
+    ...base,
+    levelsByChannel: {},
+    curvesByChannel: {},
+  };
+
+  TONE_CHANNELS.forEach((channel) => {
+    const rawLevels = base.levelsByChannel?.[channel] || {};
+    let black = Number(rawLevels.black);
+    let mid = Number(rawLevels.mid);
+    let white = Number(rawLevels.white);
+
+    if (!Number.isFinite(black)) black = Number(base.levelsBlack);
+    if (!Number.isFinite(mid)) mid = Number(base.levelsMid);
+    if (!Number.isFinite(white)) white = Number(base.levelsWhite);
+    if (!Number.isFinite(black)) black = 0;
+    if (!Number.isFinite(mid)) mid = 128;
+    if (!Number.isFinite(white)) white = 255;
+
+    black = clamp(Math.round(black), 0, 253);
+    mid = clamp(Math.round(mid), black + 1, 254);
+    white = clamp(Math.round(white), mid + 1, 255);
+    clone.levelsByChannel[channel] = { black, mid, white };
+
+    let points = Array.isArray(base.curvesByChannel?.[channel])
+      ? base.curvesByChannel[channel].map((point) => ({
+          x: clamp(Math.round(Number(point?.x)), 0, 255),
+          y: clamp(Math.round(Number(point?.y)), 0, 255),
+        }))
+      : [];
+
+    if (points.length < 2) {
+      points = [
+        { x: 0, y: Number(base.curvesShadows) || 0 },
+        { x: 128, y: Number(base.curvesMidtones) || 128 },
+        { x: 255, y: Number(base.curvesHighlights) || 255 },
+      ];
+    }
+
+    points = points
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      .sort((a, b) => a.x - b.x);
+    points[0] = { x: 0, y: clamp(Math.round(points[0]?.y ?? 0), 0, 255) };
+    points[points.length - 1] = {
+      x: 255,
+      y: clamp(Math.round(points[points.length - 1]?.y ?? 255), 0, 255),
+    };
+    for (let i = 1; i < points.length - 1; i += 1) {
+      points[i].x = clamp(points[i].x, points[i - 1].x + 1, 254);
+    }
+
+    clone.curvesByChannel[channel] = points;
+  });
+
+  clone.levelsChannel = TONE_CHANNELS.includes(base.levelsChannel) ? base.levelsChannel : "rgb";
+  clone.curvesChannel = TONE_CHANNELS.includes(base.curvesChannel) ? base.curvesChannel : "rgb";
+
+  const rgbLevels = clone.levelsByChannel.rgb;
+  clone.levelsBlack = rgbLevels.black;
+  clone.levelsMid = rgbLevels.mid;
+  clone.levelsWhite = rgbLevels.white;
+
+  const rgbPoints = clone.curvesByChannel.rgb;
+  clone.curvesShadows = rgbPoints[0].y;
+  clone.curvesMidtones = rgbPoints[Math.floor(rgbPoints.length / 2)].y;
+  clone.curvesHighlights = rgbPoints[rgbPoints.length - 1].y;
+  return clone;
+};
+
 const mapLevelsValue = (input, black, mid, white) => {
   const min = clamp(black, 0, 254);
   const max = clamp(white, min + 1, 255);
@@ -758,19 +839,39 @@ const mapLevelsValue = (input, black, mid, white) => {
   return clamp(Math.pow(remapped, gamma) * 255, 0, 255);
 };
 
-const mapCurveValue = (input, shadows, midtones, highlights) => {
-  const x = clamp(input, 0, 255);
-  const y0 = clamp(shadows, 0, 255);
-  const y1 = clamp(midtones, y0, 255);
-  const y2 = clamp(highlights, y1, 255);
-  if (x <= 128) {
-    return lerp(y0, y1, x / 128);
+const getCurveSegmentAt = (points, x) => {
+  for (let i = 0; i < points.length - 1; i += 1) {
+    if (x >= points[i].x && x <= points[i + 1].x) {
+      return i;
+    }
   }
-  return lerp(y1, y2, (x - 128) / 127);
+  return points.length - 2;
+};
+
+const evaluateCurveSpline = (points, x) => {
+  if (!Array.isArray(points) || points.length < 2) return clamp(x, 0, 255);
+  const px = clamp(x, 0, 255);
+  const segment = getCurveSegmentAt(points, px);
+  const p0 = points[Math.max(0, segment - 1)];
+  const p1 = points[segment];
+  const p2 = points[Math.min(points.length - 1, segment + 1)];
+  const p3 = points[Math.min(points.length - 1, segment + 2)];
+  const span = Math.max(1, p2.x - p1.x);
+  const t = clamp((px - p1.x) / span, 0, 1);
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const y =
+    0.5 *
+    ((2 * p1.y) +
+      (-p0.y + p2.y) * t +
+      (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+      (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+  return clamp(y, 0, 255);
 };
 
 const buildToneLuts = (photo) => {
-  const adjustments = photo.adjustments;
+  const adjustments = cloneAdjustments(photo.adjustments);
+  photo.adjustments = adjustments;
   const luts = {
     red: new Array(256),
     green: new Array(256),
@@ -785,13 +886,22 @@ const buildToneLuts = (photo) => {
     let g = i;
     let b = i;
 
-    if (appliesLevels("red")) r = mapLevelsValue(r, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
-    if (appliesLevels("green")) g = mapLevelsValue(g, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
-    if (appliesLevels("blue")) b = mapLevelsValue(b, adjustments.levelsBlack, adjustments.levelsMid, adjustments.levelsWhite);
+    if (appliesLevels("red")) {
+      const v = adjustments.levelsByChannel.red;
+      r = mapLevelsValue(r, v.black, v.mid, v.white);
+    }
+    if (appliesLevels("green")) {
+      const v = adjustments.levelsByChannel.green;
+      g = mapLevelsValue(g, v.black, v.mid, v.white);
+    }
+    if (appliesLevels("blue")) {
+      const v = adjustments.levelsByChannel.blue;
+      b = mapLevelsValue(b, v.black, v.mid, v.white);
+    }
 
-    if (appliesCurves("red")) r = mapCurveValue(r, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
-    if (appliesCurves("green")) g = mapCurveValue(g, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
-    if (appliesCurves("blue")) b = mapCurveValue(b, adjustments.curvesShadows, adjustments.curvesMidtones, adjustments.curvesHighlights);
+    if (appliesCurves("red")) r = evaluateCurveSpline(adjustments.curvesByChannel.red, r);
+    if (appliesCurves("green")) g = evaluateCurveSpline(adjustments.curvesByChannel.green, g);
+    if (appliesCurves("blue")) b = evaluateCurveSpline(adjustments.curvesByChannel.blue, b);
 
     luts.red[i] = clamp(r, 0, 255);
     luts.green[i] = clamp(g, 0, 255);
@@ -802,16 +912,12 @@ const buildToneLuts = (photo) => {
 };
 
 const getToneLutKey = (a) =>
-  [
-    a.levelsChannel,
-    a.levelsBlack,
-    a.levelsMid,
-    a.levelsWhite,
-    a.curvesChannel,
-    a.curvesShadows,
-    a.curvesMidtones,
-    a.curvesHighlights,
-  ].join("|");
+  JSON.stringify({
+    levelsChannel: a.levelsChannel,
+    levelsByChannel: a.levelsByChannel,
+    curvesChannel: a.curvesChannel,
+    curvesByChannel: a.curvesByChannel,
+  });
 
 const getToneLutsForPhoto = (photo) => {
   if (!photo) return null;
@@ -927,6 +1033,7 @@ const drawLevelsCanvas = (photo) => {
   if (!photo) return;
 
   const channel = photo.adjustments.levelsChannel || "rgb";
+  const levels = photo.adjustments.levelsByChannel?.[channel] || { black: 0, mid: 128, white: 255 };
   const bins = getPhotoHistogramBins(photo, { applyAdjustments: false, channel: channel === "rgb" ? "luma" : channel });
   const peak = bins.reduce((m, v) => Math.max(m, v), 1);
   ctx.beginPath();
@@ -941,9 +1048,20 @@ const drawLevelsCanvas = (photo) => {
   ctx.fillStyle = "rgba(170,170,170,0.35)";
   ctx.fill();
 
-  const blackX = (photo.adjustments.levelsBlack / 255) * (w - 1);
-  const midX = (photo.adjustments.levelsMid / 255) * (w - 1);
-  const whiteX = (photo.adjustments.levelsWhite / 255) * (w - 1);
+  const blackX = (levels.black / 255) * (w - 1);
+  const midX = (levels.mid / 255) * (w - 1);
+  const whiteX = (levels.white / 255) * (w - 1);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(blackX, 0);
+  ctx.lineTo(blackX, h);
+  ctx.moveTo(midX, 0);
+  ctx.lineTo(midX, h);
+  ctx.moveTo(whiteX, 0);
+  ctx.lineTo(whiteX, h);
+  ctx.stroke();
+
   ctx.strokeStyle = "#f3f3f3";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -954,9 +1072,12 @@ const drawLevelsCanvas = (photo) => {
 
   [blackX, midX, whiteX].forEach((x) => {
     ctx.beginPath();
-    ctx.arc(x, h - 10, 4.5, 0, Math.PI * 2);
+    ctx.arc(x, h - 10, 6.5, 0, Math.PI * 2);
     ctx.fillStyle = "#f5f5f5";
     ctx.fill();
+    ctx.strokeStyle = "#141414";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   });
 };
 
@@ -985,33 +1106,50 @@ const drawCurvesCanvas = (photo) => {
   }
   if (!photo) return;
 
-  const a = photo.adjustments;
-  const points = [
-    { x: 0, y: h - (a.curvesShadows / 255) * h },
-    { x: w / 2, y: h - (a.curvesMidtones / 255) * h },
-    { x: w, y: h - (a.curvesHighlights / 255) * h },
-  ];
+  const channel = photo.adjustments.curvesChannel || "rgb";
+  const pointsRaw = photo.adjustments.curvesByChannel?.[channel] || [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+  const points = pointsRaw.map((point) => ({
+    x: (point.x / 255) * (w - 1),
+    y: h - (point.y / 255) * h,
+  }));
 
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  ctx.lineTo(points[1].x, points[1].y);
-  ctx.lineTo(points[2].x, points[2].y);
+  for (let x = 0; x < w; x += 1) {
+    const input = (x / (w - 1)) * 255;
+    const y = h - (evaluateCurveSpline(pointsRaw, input) / 255) * h;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
   ctx.stroke();
 
-  points.forEach((p) => {
+  points.forEach((p, index) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, index === 0 || index === points.length - 1 ? 5.3 : 6.5, 0, Math.PI * 2);
     ctx.fillStyle = "#f5f5f5";
     ctx.fill();
+    ctx.strokeStyle = "#141414";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   });
 };
 
 const renderTonePanels = () => {
   const photo = getSelectedPhoto();
+  if (photo) photo.adjustments = cloneAdjustments(photo.adjustments);
   if (levelsChannelSelect) levelsChannelSelect.value = photo?.adjustments.levelsChannel || "rgb";
   if (curvesChannelSelect) curvesChannelSelect.value = photo?.adjustments.curvesChannel || "rgb";
+  if (levelsReadout) {
+    const levels = photo?.adjustments?.levelsByChannel?.[photo?.adjustments?.levelsChannel || "rgb"];
+    if (!levels) {
+      levelsReadout.textContent = "In 0 | Gamma 1.00 | Out 255";
+    } else {
+      const midNorm = clamp((levels.mid - levels.black) / Math.max(1, levels.white - levels.black), 0.01, 0.99);
+      const gamma = Math.log(0.5) / Math.log(midNorm);
+      levelsReadout.textContent = `In ${levels.black} | Gamma ${gamma.toFixed(2)} | Out ${levels.white}`;
+    }
+  }
   drawLevelsCanvas(photo);
   drawCurvesCanvas(photo);
 };
@@ -1833,7 +1971,7 @@ const createPhotoRecord = (file, overrides = {}) => {
     id,
   file: safeFile,
   url: safeFile.size > 0 ? URL.createObjectURL(safeFile) : "",
-  adjustments: { ...defaultAdjustments },
+  adjustments: cloneAdjustments(defaultAdjustments),
   rotation: 0,
   width: 0,
   height: 0,
@@ -1861,7 +1999,7 @@ const getProjectPhotoPayload = async (photo) => {
     fileName: photo.file?.name || `photo-${photo.id}.png`,
     mimeType: photo.file?.type || "image/png",
     imageDataUrl,
-    adjustments: { ...photo.adjustments },
+    adjustments: cloneAdjustments(photo.adjustments),
     rotation: photo.rotation,
     filmLookId: photo.filmLookId,
     filmLookStrength: photo.filmLookStrength,
@@ -1923,7 +2061,7 @@ const restoreProjectFromPayload = async (payload) => {
     const file = dataUrlToFile(item.imageDataUrl, item.fileName || `photo-${Date.now()}.png`);
     const record = createPhotoRecord(file, {
       id: Number(item.id) || state.nextPhotoId,
-      adjustments: { ...defaultAdjustments, ...(item.adjustments || {}) },
+      adjustments: cloneAdjustments(item.adjustments || defaultAdjustments),
       rotation: Number(item.rotation ?? 0),
       filmLookId: item.filmLookId || "none",
       filmLookStrength: Number(item.filmLookStrength ?? 100),
@@ -3157,11 +3295,17 @@ const attachWorkspacePanning = () => {
 };
 
 const bindTonePanelEvents = () => {
-  const getLevelsHandleAtX = (photo, xPx, width) => {
+  const snapToneValue = (value) => {
+    const points = [0, 32, 64, 96, 128, 160, 192, 224, 255];
+    const snapped = points.find((point) => Math.abs(point - value) <= 3);
+    return snapped ?? value;
+  };
+
+  const getLevelsHandleAtX = (levels, xPx, width) => {
     const targets = [
-      { key: "black", value: photo.adjustments.levelsBlack },
-      { key: "mid", value: photo.adjustments.levelsMid },
-      { key: "white", value: photo.adjustments.levelsWhite },
+      { key: "black", value: levels.black },
+      { key: "mid", value: levels.mid },
+      { key: "white", value: levels.white },
     ];
     let best = null;
     targets.forEach((item) => {
@@ -3169,24 +3313,45 @@ const bindTonePanelEvents = () => {
       const dist = Math.abs(px - xPx);
       if (!best || dist < best.dist) best = { ...item, dist };
     });
-    return best && best.dist <= 14 ? best.key : null;
+    return best && best.dist <= 18 ? best.key : null;
   };
 
-  const clampLevels = (a) => {
-    a.levelsBlack = clamp(Math.round(a.levelsBlack), 0, 253);
-    a.levelsMid = clamp(Math.round(a.levelsMid), a.levelsBlack + 1, 254);
-    a.levelsWhite = clamp(Math.round(a.levelsWhite), a.levelsMid + 1, 255);
+  const clampLevels = (levels) => {
+    levels.black = clamp(Math.round(levels.black), 0, 253);
+    levels.mid = clamp(Math.round(levels.mid), levels.black + 1, 254);
+    levels.white = clamp(Math.round(levels.white), levels.mid + 1, 255);
   };
 
-  const clampCurves = (a) => {
-    a.curvesShadows = clamp(Math.round(a.curvesShadows), 0, 254);
-    a.curvesMidtones = clamp(Math.round(a.curvesMidtones), a.curvesShadows, 255);
-    a.curvesHighlights = clamp(Math.round(a.curvesHighlights), a.curvesMidtones, 255);
+  const normalizeCurvePoints = (points) => {
+    if (!Array.isArray(points) || points.length < 2) return [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+    const sorted = points
+      .map((point) => ({
+        x: clamp(Math.round(Number(point?.x)), 0, 255),
+        y: clamp(Math.round(Number(point?.y)), 0, 255),
+      }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      .sort((a, b) => a.x - b.x);
+
+    sorted[0] = { x: 0, y: sorted[0].y };
+    sorted[sorted.length - 1] = { x: 255, y: sorted[sorted.length - 1].y };
+    for (let i = 1; i < sorted.length - 1; i += 1) {
+      sorted[i].x = clamp(sorted[i].x, sorted[i - 1].x + 1, 254);
+    }
+    return sorted.slice(0, 12);
+  };
+
+  const getCurrentCurvePoints = (photo) => {
+    const channel = photo.adjustments.curvesChannel || "rgb";
+    return {
+      channel,
+      points: photo.adjustments.curvesByChannel[channel],
+    };
   };
 
   levelsChannelSelect?.addEventListener("change", (event) => {
     const photo = getSelectedPhoto();
     if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
     capturePhotoHistory(photo);
     photo.adjustments.levelsChannel = String(event.target.value || "rgb");
     applyAdjustmentsToPreview();
@@ -3195,17 +3360,41 @@ const bindTonePanelEvents = () => {
   curvesChannelSelect?.addEventListener("change", (event) => {
     const photo = getSelectedPhoto();
     if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
     capturePhotoHistory(photo);
     photo.adjustments.curvesChannel = String(event.target.value || "rgb");
+    applyAdjustmentsToPreview();
+  });
+
+  levelsResetBtn?.addEventListener("click", () => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const channel = photo.adjustments.levelsChannel || "rgb";
+    capturePhotoHistory(photo);
+    photo.adjustments.levelsByChannel[channel] = { black: 0, mid: 128, white: 255 };
+    applyAdjustmentsToPreview();
+  });
+
+  curvesResetBtn?.addEventListener("click", () => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const channel = photo.adjustments.curvesChannel || "rgb";
+    capturePhotoHistory(photo);
+    photo.adjustments.curvesByChannel[channel] = [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }];
     applyAdjustmentsToPreview();
   });
 
   levelsCanvas?.addEventListener("pointerdown", (event) => {
     const photo = getSelectedPhoto();
     if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const channel = photo.adjustments.levelsChannel || "rgb";
+    const levels = photo.adjustments.levelsByChannel[channel];
     const rect = levelsCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const handle = getLevelsHandleAtX(photo, x, levelsCanvas.width);
+    const x = ((event.clientX - rect.left) / rect.width) * levelsCanvas.width;
+    const handle = getLevelsHandleAtX(levels, x, levelsCanvas.width);
     if (!handle) return;
     capturePhotoHistory(photo);
     toneDragState.levelsHandle = handle;
@@ -3216,13 +3405,16 @@ const bindTonePanelEvents = () => {
   levelsCanvas?.addEventListener("pointermove", (event) => {
     const photo = getSelectedPhoto();
     if (!photo || !toneDragState.levelsHandle) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const channel = photo.adjustments.levelsChannel || "rgb";
+    const levels = photo.adjustments.levelsByChannel[channel];
     const rect = levelsCanvas.getBoundingClientRect();
-    const x = clamp(event.clientX - rect.left, 0, rect.width);
-    const value = Math.round((x / rect.width) * 255);
-    if (toneDragState.levelsHandle === "black") photo.adjustments.levelsBlack = value;
-    if (toneDragState.levelsHandle === "mid") photo.adjustments.levelsMid = value;
-    if (toneDragState.levelsHandle === "white") photo.adjustments.levelsWhite = value;
-    clampLevels(photo.adjustments);
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    const value = snapToneValue(Math.round(x * 255));
+    if (toneDragState.levelsHandle === "black") levels.black = value;
+    if (toneDragState.levelsHandle === "mid") levels.mid = value;
+    if (toneDragState.levelsHandle === "white") levels.white = value;
+    clampLevels(levels);
     applyAdjustmentsToPreview();
   });
 
@@ -3236,42 +3428,101 @@ const bindTonePanelEvents = () => {
   curvesCanvas?.addEventListener("pointerdown", (event) => {
     const photo = getSelectedPhoto();
     if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const { channel, points } = getCurrentCurvePoints(photo);
     const rect = curvesCanvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * curvesCanvas.width;
-    const y = ((event.clientY - rect.top) / rect.height) * curvesCanvas.height;
-    const points = [
-      { key: "curvesShadows", x: 0, y: curvesCanvas.height - (photo.adjustments.curvesShadows / 255) * curvesCanvas.height },
-      { key: "curvesMidtones", x: curvesCanvas.width / 2, y: curvesCanvas.height - (photo.adjustments.curvesMidtones / 255) * curvesCanvas.height },
-      { key: "curvesHighlights", x: curvesCanvas.width, y: curvesCanvas.height - (photo.adjustments.curvesHighlights / 255) * curvesCanvas.height },
-    ];
+    const x = clamp(((event.clientX - rect.left) / rect.width) * 255, 0, 255);
+    const y = clamp((1 - (event.clientY - rect.top) / rect.height) * 255, 0, 255);
     let best = null;
-    points.forEach((p) => {
-      const d = Math.hypot(p.x - x, p.y - y);
-      if (!best || d < best.d) best = { key: p.key, d };
+    points.forEach((point, index) => {
+      const px = (point.x / 255) * curvesCanvas.width;
+      const py = curvesCanvas.height - (point.y / 255) * curvesCanvas.height;
+      const clickX = (x / 255) * curvesCanvas.width;
+      const clickY = curvesCanvas.height - (y / 255) * curvesCanvas.height;
+      const d = Math.hypot(px - clickX, py - clickY);
+      if (!best || d < best.d) best = { index, d };
     });
-    if (!best || best.d > 16) return;
+
+    if (best && best.d <= 16) {
+      capturePhotoHistory(photo);
+      toneDragState.curvesHandleIndex = best.index;
+      curvesCanvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      return;
+    }
+
     capturePhotoHistory(photo);
-    toneDragState.curvesHandle = best.key;
+    points.push({ x, y });
+    photo.adjustments.curvesByChannel[channel] = normalizeCurvePoints(points);
+    toneDragState.curvesHandleIndex = photo.adjustments.curvesByChannel[channel].findIndex(
+      (point) => Math.abs(point.x - x) <= 1 && Math.abs(point.y - y) <= 1,
+    );
+    if (toneDragState.curvesHandleIndex < 0) {
+      toneDragState.curvesHandleIndex = getCurveSegmentAt(photo.adjustments.curvesByChannel[channel], x);
+    }
     curvesCanvas.setPointerCapture(event.pointerId);
+    applyAdjustmentsToPreview();
     event.preventDefault();
   });
 
   curvesCanvas?.addEventListener("pointermove", (event) => {
     const photo = getSelectedPhoto();
-    if (!photo || !toneDragState.curvesHandle) return;
+    if (!photo || toneDragState.curvesHandleIndex == null) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const { channel, points } = getCurrentCurvePoints(photo);
     const rect = curvesCanvas.getBoundingClientRect();
-    const y = clamp(event.clientY - rect.top, 0, rect.height);
-    const value = Math.round((1 - y / rect.height) * 255);
-    photo.adjustments[toneDragState.curvesHandle] = value;
-    clampCurves(photo.adjustments);
+    const point = points[toneDragState.curvesHandleIndex];
+    if (!point) return;
+
+    let nextX = clamp(Math.round(((event.clientX - rect.left) / rect.width) * 255), 0, 255);
+    let nextY = clamp(Math.round((1 - (event.clientY - rect.top) / rect.height) * 255), 0, 255);
+    nextX = snapToneValue(nextX);
+    nextY = snapToneValue(nextY);
+
+    if (toneDragState.curvesHandleIndex === 0) {
+      nextX = 0;
+    } else if (toneDragState.curvesHandleIndex === points.length - 1) {
+      nextX = 255;
+    } else {
+      const prev = points[toneDragState.curvesHandleIndex - 1];
+      const next = points[toneDragState.curvesHandleIndex + 1];
+      nextX = clamp(nextX, prev.x + 1, next.x - 1);
+    }
+
+    point.x = nextX;
+    point.y = nextY;
+    photo.adjustments.curvesByChannel[channel] = normalizeCurvePoints(points);
+    applyAdjustmentsToPreview();
+  });
+
+  curvesCanvas?.addEventListener("dblclick", (event) => {
+    const photo = getSelectedPhoto();
+    if (!photo) return;
+    photo.adjustments = cloneAdjustments(photo.adjustments);
+    const { channel, points } = getCurrentCurvePoints(photo);
+    const rect = curvesCanvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * curvesCanvas.width;
+    const y = ((event.clientY - rect.top) / rect.height) * curvesCanvas.height;
+    let best = null;
+    points.forEach((point, index) => {
+      if (index === 0 || index === points.length - 1) return;
+      const px = (point.x / 255) * curvesCanvas.width;
+      const py = curvesCanvas.height - (point.y / 255) * curvesCanvas.height;
+      const d = Math.hypot(px - x, py - y);
+      if (!best || d < best.d) best = { index, d };
+    });
+    if (!best || best.d > 16) return;
+    capturePhotoHistory(photo);
+    points.splice(best.index, 1);
+    photo.adjustments.curvesByChannel[channel] = normalizeCurvePoints(points);
     applyAdjustmentsToPreview();
   });
 
   curvesCanvas?.addEventListener("pointerup", () => {
-    toneDragState.curvesHandle = null;
+    toneDragState.curvesHandleIndex = null;
   });
   curvesCanvas?.addEventListener("pointercancel", () => {
-    toneDragState.curvesHandle = null;
+    toneDragState.curvesHandleIndex = null;
   });
 };
 
@@ -3692,7 +3943,7 @@ resetBtn.addEventListener("click", () => {
   const photo = getSelectedPhoto();
   if (!photo) return;
   capturePhotoHistory(photo);
-  photo.adjustments = { ...defaultAdjustments };
+  photo.adjustments = cloneAdjustments(defaultAdjustments);
   applyAdjustmentsToPreview();
 });
 
