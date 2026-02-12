@@ -48,19 +48,16 @@ body {
 }
 
 .landing-brand {
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
-  font-size: 2rem;
-  line-height: 1;
-  letter-spacing: -0.03em;
 }
 
-.landing-brand-light {
-  font-weight: 450;
-}
-
-.landing-brand-bold {
-  font-weight: 750;
+.landing-brand-logo {
+  display: block;
+  width: 184px;
+  max-width: 100%;
+  height: auto;
 }
 
 .landing-nav-links {
@@ -128,8 +125,8 @@ body {
     padding: 0 14px;
   }
 
-  .landing-brand {
-    font-size: 1.6rem;
+  .landing-brand-logo {
+    width: 142px;
   }
 
   .landing-nav-links {
@@ -178,6 +175,19 @@ body {
   font-size: 1rem;
   letter-spacing: 0.03em;
   font-weight: 500;
+}
+
+.topbar-brand-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.topbar-logo {
+  display: block;
+  width: 126px;
+  max-width: 100%;
+  height: auto;
 }
 
 .zoom-controls {
