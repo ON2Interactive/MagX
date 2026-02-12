@@ -19,15 +19,24 @@ html,
 body {
   margin: 0;
   height: 100%;
-  font-family: "Helvetica Neue", Helvetica, Inter, Arial, sans-serif;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
   background: linear-gradient(180deg, #1a1a1a 0%, #101010 100%);
-  color: var(--soft-white);
+  color: var(--text);
   font-size: 1rem;
 }
 
-h1,
-h2,
-h3 {
+.landing-page,
+.common-page {
+  font-family: "Helvetica Neue", Helvetica, Inter, Arial, sans-serif;
+  color: var(--soft-white);
+}
+
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.common-page h1,
+.common-page h2,
+.common-page h3 {
   margin: 0;
   color: var(--soft-white);
   font-family: "Helvetica Neue", Helvetica, Inter, Arial, sans-serif;
@@ -35,15 +44,18 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-h1 {
+.landing-page h1,
+.common-page h1 {
   font-size: 48px;
 }
 
-h2 {
+.landing-page h2,
+.common-page h2 {
   font-size: 36px;
 }
 
-h3 {
+.landing-page h3,
+.common-page h3 {
   font-size: 24px;
 }
 
@@ -147,9 +159,12 @@ h3 {
 }
 
 @media (max-width: 768px) {
-  h1,
-  h2,
-  h3 {
+  .landing-page h1,
+  .landing-page h2,
+  .landing-page h3,
+  .common-page h1,
+  .common-page h2,
+  .common-page h3 {
     font-size: 18px;
   }
 }
