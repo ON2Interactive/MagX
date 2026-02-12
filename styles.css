@@ -8,6 +8,7 @@
   --toolbar-width: 58px;
   --filmstrip-height: 136px;
   --thumb-size: 100px;
+  --soft-white: rgba(255, 255, 255, 0.9);
 }
 
 * {
@@ -18,9 +19,32 @@ html,
 body {
   margin: 0;
   height: 100%;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   background: linear-gradient(180deg, #1a1a1a 0%, #101010 100%);
-  color: var(--text);
+  color: var(--soft-white);
+  font-size: 1rem;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  color: var(--soft-white);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 48px;
+}
+
+h2 {
+  font-size: 36px;
+}
+
+h3 {
+  font-size: 24px;
 }
 
 .landing-page {
@@ -119,6 +143,14 @@ body {
 
   .landing-nav-links a {
     font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 768px) {
+  h1,
+  h2,
+  h3 {
+    font-size: 18px;
   }
 }
 
