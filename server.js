@@ -580,7 +580,7 @@ function serveStatic(req, res) {
   });
 }
 
-const server = http.createServer((req, res) => {
+function requestHandler(req, res) {
   if (req.method === "POST" && req.url === "/api/image-edit") {
     handleNanoBananaEdit(req, res);
     return;
@@ -620,8 +620,13 @@ const server = http.createServer((req, res) => {
 
   res.writeHead(405);
   res.end("Method Not Allowed");
-});
+}
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`Server running at http://127.0.0.1:${PORT}`);
-});
+if (require.main === module) {
+  const server = http.createServer(requestHandler);
+  server.listen(PORT, "127.0.0.1", () => {
+    console.log(`Server running at http://127.0.0.1:${PORT}`);
+  });
+}
+
+module.exports = requestHandler;
