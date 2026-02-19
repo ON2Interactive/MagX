@@ -1265,6 +1265,20 @@ function serveStatic(req, res) {
 function requestHandler(req, res) {
   const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
   const pathname = reqUrl.pathname;
+  const legacyUuidPathMatch = String(pathname || "").match(
+    /^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/
+  );
+
+  if (req.method === "GET" && legacyUuidPathMatch?.[1]) {
+    const shareId = legacyUuidPathMatch[1];
+    const location = `/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+    res.writeHead(302, {
+      Location: location,
+      "Cache-Control": "no-store",
+    });
+    res.end();
+    return;
+  }
 
   if (req.method === "GET" && pathname === "/api/debug/share-config") {
     return sendJson(res, 200, {

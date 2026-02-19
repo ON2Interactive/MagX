@@ -2588,16 +2588,21 @@ async function createShareLink() {
 function normalizeShareLinkInput(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
+  const uuidPathPattern = /^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
   try {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
       const id = String(parsed.searchParams.get("share") || "").trim();
       if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      const pathMatch = String(parsed.pathname || "").match(uuidPathPattern);
+      if (pathMatch?.[1]) return `${parsed.origin}/editor?share=${encodeURIComponent(pathMatch[1])}&preview=1`;
     }
     if (raw.startsWith("/")) {
       const parsed = new URL(raw, window.location.origin);
       const id = String(parsed.searchParams.get("share") || "").trim();
       if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      const pathMatch = String(parsed.pathname || "").match(uuidPathPattern);
+      if (pathMatch?.[1]) return `${parsed.origin}/editor?share=${encodeURIComponent(pathMatch[1])}&preview=1`;
     }
   } catch {
     return "";
@@ -5841,7 +5846,9 @@ function buildPageTurnPreviewHtml() {
   persistCurrentPageState();
   ensureInheritedViewsUpToDate();
   const currentUrlParams = new URLSearchParams(window.location.search);
-  const currentShareId = String(currentUrlParams.get("share") || "").trim();
+  const pathShareIdMatch = String(window.location.pathname || "")
+    .match(/^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  const currentShareId = String(currentUrlParams.get("share") || pathShareIdMatch?.[1] || "").trim();
   const shareUrlHint =
     (currentShareId
       ? `${window.location.origin}/editor?share=${encodeURIComponent(currentShareId)}&preview=1`
@@ -6210,22 +6217,22 @@ function buildPageTurnPreviewHtml() {
     });
     embedCodeBtn?.addEventListener("click", () => {
       if (embedCodeBtn.disabled) return;
+      const url = String(shareUrlHint || "").trim();
+      if (url) {
+        const code = '<iframe src="' + url + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
+        navigator.clipboard.writeText(code).then(() => {
+          alert("Embed code copied.");
+        }).catch(() => {
+          window.prompt("Copy embed code:", code);
+        });
+        return;
+      }
       if (window.opener) {
         embedCodeBtn.disabled = true;
         window.opener.postMessage({ type: "${PREVIEW_COPY_EMBED_MESSAGE}" }, window.location.origin);
         return;
       }
-      const url = String(shareUrlHint || "").trim();
-      if (!url) {
-        alert("Embed code unavailable for this preview.");
-        return;
-      }
-      const code = '<iframe src="' + url + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
-      navigator.clipboard.writeText(code).then(() => {
-        alert("Embed code copied.");
-      }).catch(() => {
-        window.prompt("Copy embed code:", code);
-      });
+      alert("Embed code unavailable for this preview.");
     });
     sharePreviewBtn?.addEventListener("click", () => {
       const currentHref = String(window.location.href || "").split("#")[0];
