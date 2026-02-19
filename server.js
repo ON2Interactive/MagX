@@ -1223,10 +1223,11 @@ async function handleLayoutGenerate(req, res) {
 
 function serveStatic(req, res) {
   const rawPath = decodeURIComponent(req.url.split("?")[0] || "/");
+  const isUuidSharePath = /^\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(rawPath);
   let reqPath =
     rawPath === "/"
       ? "/index.html"
-      : rawPath === "/magx" || rawPath === "/editor"
+      : rawPath === "/magx" || rawPath === "/editor" || isUuidSharePath
         ? "/editor.html"
         : rawPath === "/preview"
           ? "/preview.html"
