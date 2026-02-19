@@ -45,7 +45,7 @@
     },
     {
       "src": "/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
-      "dest": "/editor?share=$1&preview=1"
+      "dest": "/editor.html?share=$1&preview=1"
     },
     {
       "src": "/preview",
