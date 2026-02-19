@@ -1117,6 +1117,16 @@ function requestHandler(req, res) {
   const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
   const pathname = reqUrl.pathname;
 
+  if (req.method === "GET" && pathname === "/api/debug/share-config") {
+    return sendJson(res, 200, {
+      supabaseEnabled: hasSupabaseShareBackend(),
+      hasSupabaseUrl: Boolean(SUPABASE_URL),
+      hasSupabaseServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      storageBucket: SUPABASE_STORAGE_BUCKET || "",
+      sharePayloadMaxBytes: SHARE_PAYLOAD_MAX_BYTES,
+    });
+  }
+
   if (req.method === "POST" && pathname === "/api/layout-generate") {
     handleLayoutGenerate(req, res);
     return;
