@@ -285,6 +285,16 @@
     </div>
     <script>
       (() => {
+        const path = String(window.location.pathname || "").toLowerCase();
+        if (path !== "/preview") return;
+        const params = new URLSearchParams(window.location.search);
+        const shareId = String(params.get("share") || "").trim();
+        if (!shareId) return;
+        const target = `/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+        window.location.replace(target);
+      })();
+
+      (() => {
         const footerYear = document.getElementById("footerYear");
         if (footerYear) footerYear.textContent = String(new Date().getFullYear());
       })();
