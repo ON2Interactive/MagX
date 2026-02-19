@@ -2588,7 +2588,7 @@ async function createShareLink() {
 function normalizeShareLinkInput(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const uuidPathPattern = /^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
+  const uuidPathPattern = /^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
   try {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
@@ -2710,7 +2710,7 @@ async function loadSharedProjectById(shareId) {
 async function loadSharedProjectFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
   const legacyPathShareMatch = String(window.location.pathname || "")
-    .match(/^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+    .match(/^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
   const shareId = String(params.get("share") || legacyPathShareMatch?.[1] || "").trim();
   const previewParam = String(params.get("preview") || "").trim().toLowerCase();
   const onPreviewRoute = String(window.location.pathname || "").toLowerCase() === "/preview";
@@ -5225,11 +5225,11 @@ function buildLayerHtml(viewState, options = {}) {
           textMode === "none"
             ? "color:transparent;"
             :
-          textMode === "gradient"
-            ? `color:transparent;background-image:${escapeHtml(buildGradientCss(item.textGradientFrom, item.textGradientTo, item.textGradientAngle))};background-clip:text;-webkit-background-clip:text;`
-            : textMode === "image" && item.textFillImageSrc
-              ? `color:transparent;background-image:url(${escapeHtml(item.textFillImageSrc)});background-size:${getTextImageScale(item)}% auto;background-position:${getTextImageX(item)}% ${getTextImageY(item)}%;background-repeat:no-repeat;background-clip:text;-webkit-background-clip:text;`
-              : `color:${escapeHtml(item.textColor)};`;
+            textMode === "gradient"
+              ? `color:transparent;background-image:${escapeHtml(buildGradientCss(item.textGradientFrom, item.textGradientTo, item.textGradientAngle))};background-clip:text;-webkit-background-clip:text;`
+              : textMode === "image" && item.textFillImageSrc
+                ? `color:transparent;background-image:url(${escapeHtml(item.textFillImageSrc)});background-size:${getTextImageScale(item)}% auto;background-position:${getTextImageX(item)}% ${getTextImageY(item)}%;background-repeat:no-repeat;background-clip:text;-webkit-background-clip:text;`
+                : `color:${escapeHtml(item.textColor)};`;
         return `<div style="${commonStyle};${textFillStyle}font:${normalizeFontWeight(item.fontWeight ?? 600)} ${effectiveFontSize}px ${escapeHtml(item.fontFamily)};white-space:pre-wrap;line-height:${lineHeight};word-spacing:${wordSpacing}px;letter-spacing:${tracking}px;text-decoration:${decoration};text-align:${textAlign};text-transform:${textCase === "uppercase" ? "uppercase" : "none"};font-variant-caps:${textCase === "small-caps" ? "small-caps" : "normal"};position:absolute;translate:0 ${scriptOffset}px;">${escapeHtml(getRenderedTextContent(item))}</div>`;
       }
 
@@ -5855,7 +5855,7 @@ function buildPageTurnPreviewHtml() {
   ensureInheritedViewsUpToDate();
   const currentUrlParams = new URLSearchParams(window.location.search);
   const pathShareIdMatch = String(window.location.pathname || "")
-    .match(/^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+    .match(/^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
   const currentShareId = String(currentUrlParams.get("share") || pathShareIdMatch?.[1] || "").trim();
   const shareUrlHint =
     (currentShareId
@@ -6224,12 +6224,15 @@ function buildPageTurnPreviewHtml() {
       window.opener.postMessage({ type: "${PREVIEW_DOWNLOAD_PDF_MESSAGE}" }, window.location.origin);
     });
     function resolveStablePreviewUrl() {
+      // The current page might be a blob: URL (from the editor's "Preview" button)
+      // or a stable https:// URL (from a shared link).
       const currentHref = String(window.location.href || "").split("#")[0];
-      if (/^https?:\\/\\//i.test(currentHref)) {
+      // We check for http/https to determine if this is a "stable" (shareable) URL.
+      if (/^https?:\/\//i.test(currentHref) && !currentHref.startsWith("blob:")) {
         return currentHref;
       }
       const hinted = String(shareUrlHint || "").trim();
-      if (/^https?:\\/\\//i.test(hinted)) {
+      if (/^https?:\/\//i.test(hinted)) {
         return hinted;
       }
       return "";
@@ -6329,13 +6332,12 @@ function buildPageTurnPreviewHtml() {
       }
       if (event.data?.type === "${PREVIEW_COPY_EMBED_RESULT_MESSAGE}") {
         if (embedCodeBtn) embedCodeBtn.disabled = false;
-        if (!event.data?.ok) {
-          alert(event.data?.message || "Could not create embed code.");
-          return;
+        let code = String(event.data?.embedCode || "").trim();
+        if ((!event.data?.ok || !code) && resolveStablePreviewUrl()) {
+          code = '<iframe src="' + resolveStablePreviewUrl() + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
         }
-        const code = String(event.data?.embedCode || "").trim();
         if (!code) {
-          alert("Embed code unavailable.");
+          alert(event.data?.message || "Embed code unavailable.");
           return;
         }
         try {
@@ -6348,13 +6350,12 @@ function buildPageTurnPreviewHtml() {
       }
       if (event.data?.type === "${PREVIEW_COPY_PREVIEW_LINK_RESULT_MESSAGE}") {
         if (sharePreviewBtn) sharePreviewBtn.disabled = false;
-        if (!event.data?.ok) {
-          alert(event.data?.message || "Could not create preview link.");
-          return;
+        let url = String(event.data?.url || "").trim();
+        if ((!event.data?.ok || !url) && resolveStablePreviewUrl()) {
+          url = resolveStablePreviewUrl();
         }
-        const url = String(event.data?.url || "").trim();
         if (!url) {
-          alert("Preview link unavailable.");
+          alert(event.data?.message || "Preview link unavailable.");
           return;
         }
         try {
