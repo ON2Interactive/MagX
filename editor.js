@@ -2342,6 +2342,28 @@ function getOrCreateClientOwnerId() {
   return generated;
 }
 
+async function maybeCompressJsonForShare(payloadObject) {
+  const json = JSON.stringify(payloadObject || {});
+  const headers = { "Content-Type": "application/json" };
+  let body = json;
+  try {
+    if (typeof CompressionStream === "function") {
+      const input = new TextEncoder().encode(json);
+      if (input.byteLength > 500 * 1024) {
+        const stream = new Blob([input]).stream().pipeThrough(new CompressionStream("gzip"));
+        const compressed = await new Response(stream).arrayBuffer();
+        if (compressed.byteLength > 0 && compressed.byteLength < input.byteLength) {
+          body = compressed;
+          headers["Content-Encoding"] = "gzip";
+        }
+      }
+    }
+  } catch {
+    // Fallback to plain JSON body.
+  }
+  return { body, headers };
+}
+
 async function optimizeShareImageSource(src, options = {}) {
   const value = String(src || "");
   if (!value.startsWith("data:image/")) return value;
@@ -2461,12 +2483,14 @@ async function createShareLink() {
   setShareModalStatus("Preparing share link...");
   const payload = await buildSharePayload();
   const ownerId = getOrCreateClientOwnerId();
+  const requestPayload = { project: payload, ownerId };
+  const requestBody = await maybeCompressJsonForShare(requestPayload);
   let response;
   try {
     response = await fetch("/api/share", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project: payload, ownerId }),
+      headers: requestBody.headers,
+      body: requestBody.body,
     });
   } catch (error) {
     const message = error?.message || "";

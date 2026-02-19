@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 
 const ROOT = __dirname;
 
@@ -319,17 +320,18 @@ function pruneShareStore() {
 }
 
 function handleShareCreate(req, res) {
-  let raw = "";
+  const chunks = [];
+  let rawBytes = 0;
   let exceedsHardLimit = false;
   const hardLimitBytes = hasSupabaseShareBackend()
     ? 120 * 1024 * 1024
     : SHARE_PAYLOAD_MAX_BYTES + 2 * 1024 * 1024;
   req.on("data", (chunk) => {
     if (exceedsHardLimit) return;
-    raw += chunk;
-    if (Buffer.byteLength(raw, "utf8") > hardLimitBytes) {
+    chunks.push(chunk);
+    rawBytes += chunk.length;
+    if (rawBytes > hardLimitBytes) {
       exceedsHardLimit = true;
-      raw = "";
     }
   });
 
@@ -338,7 +340,13 @@ function handleShareCreate(req, res) {
       return sendJson(res, 413, { error: "Project payload is too large to share." });
     }
     try {
-      const parsed = JSON.parse(raw || "{}");
+      const compressedBody = Buffer.concat(chunks);
+      let bodyBuffer = compressedBody;
+      const contentEncoding = String(req.headers["content-encoding"] || "").toLowerCase();
+      if (contentEncoding.includes("gzip")) {
+        bodyBuffer = zlib.gunzipSync(compressedBody);
+      }
+      const parsed = JSON.parse(bodyBuffer.toString("utf8") || "{}");
       const project = parsed?.project || parsed;
       const ownerId =
         normalizeOwnerId(parsed?.ownerId) ||
