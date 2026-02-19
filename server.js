@@ -5,6 +5,15 @@ const crypto = require("crypto");
 
 const ROOT = __dirname;
 
+function cleanEnvValue(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   const content = fs.readFileSync(filePath, "utf8");
@@ -32,6 +41,9 @@ const PORT = Number(process.env.PORT || 4174);
 const SHARE_STORE_FILE = path.join(ROOT, ".magx-shares.json");
 const SHARE_PAYLOAD_MAX_BYTES = 40 * 1024 * 1024;
 const SHARE_MAX_ITEMS = 300;
+const SUPABASE_URL = cleanEnvValue(process.env.SUPABASE_URL || "");
+const SUPABASE_SERVICE_ROLE_KEY = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || "");
+const SUPABASE_STORAGE_BUCKET = cleanEnvValue(process.env.SUPABASE_STORAGE_BUCKET || "magx-assets");
 
 const MIME_BY_EXT = {
   ".html": "text/html; charset=utf-8",
@@ -88,6 +100,106 @@ function createShareId() {
   return crypto.randomBytes(9).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function hasSupabaseShareBackend() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && SUPABASE_STORAGE_BUCKET);
+}
+
+function encodeStoragePath(filePath) {
+  return String(filePath || "")
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function buildSupabaseUrl(pathname) {
+  return `${SUPABASE_URL.replace(/\/+$/, "")}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+}
+
+async function supabaseStorageUpload(filePath, body, contentType) {
+  const encodedBucket = encodeURIComponent(SUPABASE_STORAGE_BUCKET);
+  const encodedPath = encodeStoragePath(filePath);
+  const response = await fetch(buildSupabaseUrl(`/storage/v1/object/${encodedBucket}/${encodedPath}`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      "x-upsert": "true",
+      "Content-Type": contentType || "application/octet-stream",
+    },
+    body,
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Supabase upload failed (${response.status}): ${text || "unknown error"}`);
+  }
+}
+
+async function supabaseStorageDownload(filePath) {
+  const encodedBucket = encodeURIComponent(SUPABASE_STORAGE_BUCKET);
+  const encodedPath = encodeStoragePath(filePath);
+  const response = await fetch(buildSupabaseUrl(`/storage/v1/object/${encodedBucket}/${encodedPath}`), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+  });
+  return response;
+}
+
+function extensionFromMimeType(mimeType) {
+  const normalized = String(mimeType || "").toLowerCase();
+  if (normalized.includes("png")) return "png";
+  if (normalized.includes("jpeg") || normalized.includes("jpg")) return "jpg";
+  if (normalized.includes("webp")) return "webp";
+  if (normalized.includes("gif")) return "gif";
+  if (normalized.includes("svg")) return "svg";
+  return "bin";
+}
+
+function parseDataUrl(raw) {
+  const value = String(raw || "");
+  const match = value.match(/^data:([^;,]+)?(?:;charset=[^;,]+)?(;base64)?,([\s\S]*)$/i);
+  if (!match) return null;
+  const mimeType = String(match[1] || "application/octet-stream").trim().toLowerCase();
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] || "";
+  try {
+    const buffer = isBase64
+      ? Buffer.from(payload.replace(/\s+/g, ""), "base64")
+      : Buffer.from(decodeURIComponent(payload), "utf8");
+    return { mimeType, buffer };
+  } catch {
+    return null;
+  }
+}
+
+async function externalizeProjectImages(project, shareId) {
+  const safeProject = JSON.parse(JSON.stringify(project || {}));
+  const pages = Array.isArray(safeProject.pages) ? safeProject.pages : [];
+  for (const page of pages) {
+    const viewStates = page?.viewStates && typeof page.viewStates === "object" ? page.viewStates : {};
+    for (const viewKey of ["desktop", "tablet", "mobile"]) {
+      const viewState = viewStates[viewKey];
+      const elements = Array.isArray(viewState?.elements) ? viewState.elements : [];
+      for (const element of elements) {
+        if (!element || element.type !== "image" || typeof element.src !== "string") continue;
+        if (!element.src.startsWith("data:image/")) continue;
+        const parsed = parseDataUrl(element.src);
+        if (!parsed || !parsed.buffer || !parsed.buffer.length) continue;
+        const ext = extensionFromMimeType(parsed.mimeType);
+        const filename = `${crypto.randomUUID()}.${ext}`;
+        const relativePath = `assets/${filename}`;
+        const storagePath = `shares/${shareId}/${relativePath}`;
+        await supabaseStorageUpload(storagePath, parsed.buffer, parsed.mimeType);
+        element.src = `/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`;
+      }
+    }
+  }
+  return safeProject;
+}
+
 function validateSharedProjectPayload(project) {
   if (!project || typeof project !== "object" || Array.isArray(project)) {
     return { ok: false, error: "Invalid project payload." };
@@ -131,7 +243,7 @@ function handleShareCreate(req, res) {
     }
   });
 
-  req.on("end", () => {
+  req.on("end", async () => {
     if (exceedsHardLimit) {
       return sendJson(res, 413, { error: "Project payload is too large to share." });
     }
@@ -145,12 +257,19 @@ function handleShareCreate(req, res) {
 
       const id = createShareId();
       const createdAt = Date.now();
-      shareStore[id] = {
-        createdAt,
-        project,
-      };
-      pruneShareStore();
-      persistShareStore();
+      if (hasSupabaseShareBackend()) {
+        const projectForStorage = await externalizeProjectImages(project, id);
+        const storagePath = `shares/${id}/project.json`;
+        const body = Buffer.from(JSON.stringify(projectForStorage), "utf8");
+        await supabaseStorageUpload(storagePath, body, "application/json; charset=utf-8");
+      } else {
+        shareStore[id] = {
+          createdAt,
+          project,
+        };
+        pruneShareStore();
+        persistShareStore();
+      }
 
       const origin = buildRequestOrigin(req);
       const shareUrl = `${origin}/preview?share=${encodeURIComponent(id)}`;
@@ -170,6 +289,30 @@ function handleShareGet(req, res, shareId) {
   if (!id) {
     return sendJson(res, 400, { error: "Missing share id." });
   }
+  if (hasSupabaseShareBackend()) {
+    (async () => {
+      try {
+        const response = await supabaseStorageDownload(`shares/${id}/project.json`);
+        if (response.status === 404) {
+          return sendJson(res, 404, { error: "Share not found." });
+        }
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          return sendJson(res, 502, { error: text || "Could not load shared project." });
+        }
+        const raw = await response.text();
+        const project = JSON.parse(raw || "{}");
+        return sendJson(res, 200, {
+          id,
+          createdAt: new Date().toISOString(),
+          project,
+        });
+      } catch (error) {
+        return sendJson(res, 500, { error: error?.message || "Could not load shared project." });
+      }
+    })();
+    return;
+  }
   const record = shareStore[id];
   if (!record) {
     return sendJson(res, 404, { error: "Share not found." });
@@ -179,6 +322,51 @@ function handleShareGet(req, res, shareId) {
     createdAt: new Date(Number(record.createdAt || Date.now())).toISOString(),
     project: record.project,
   });
+}
+
+function handleShareAssetGet(req, res, shareId, relativeAssetPath) {
+  const id = String(shareId || "").trim();
+  const relativePath = String(relativeAssetPath || "").trim();
+  if (!hasSupabaseShareBackend()) {
+    return sendJson(res, 404, { error: "Asset backend unavailable." });
+  }
+  if (!id || !relativePath) {
+    return sendJson(res, 400, { error: "Missing share asset path." });
+  }
+  if (relativePath.includes("..") || relativePath.startsWith("/")) {
+    return sendJson(res, 400, { error: "Invalid asset path." });
+  }
+  const storagePath = `shares/${id}/${relativePath}`;
+  if (!storagePath.startsWith(`shares/${id}/assets/`)) {
+    return sendJson(res, 400, { error: "Invalid asset path." });
+  }
+  (async () => {
+    try {
+      const response = await supabaseStorageDownload(storagePath);
+      if (response.status === 404) {
+        res.writeHead(404);
+        res.end("Not Found");
+        return;
+      }
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        res.writeHead(502);
+        res.end(text || "Asset fetch failed");
+        return;
+      }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get("content-type") || "application/octet-stream";
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": bytes.length,
+      });
+      res.end(bytes);
+    } catch (error) {
+      res.writeHead(500);
+      res.end(error?.message || "Asset fetch failed");
+    }
+  })();
 }
 
 function normalizeEnvValue(value) {
@@ -770,6 +958,8 @@ function serveStatic(req, res) {
       ? "/index.html"
       : rawPath === "/magx" || rawPath === "/editor"
         ? "/editor.html"
+        : rawPath === "/preview"
+          ? "/preview.html"
         : rawPath;
   if (reqPath !== "/editor.html" && reqPath !== "/index.html" && !path.extname(reqPath)) {
     const htmlCandidate = path.join(ROOT, `${reqPath}.html`);
@@ -812,6 +1002,17 @@ function requestHandler(req, res) {
 
   if (req.method === "POST" && pathname === "/api/image-generate") {
     handleImageGenerate(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && pathname.startsWith("/api/share/") && pathname.includes("/asset/")) {
+    const match = pathname.match(/^\/api\/share\/([^/]+)\/asset\/(.+)$/);
+    if (!match) {
+      return sendJson(res, 400, { error: "Invalid share asset route." });
+    }
+    const shareId = decodeURIComponent(match[1]);
+    const relativePath = decodeURIComponent(match[2]);
+    handleShareAssetGet(req, res, shareId, relativePath);
     return;
   }
 
