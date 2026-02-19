@@ -45,6 +45,9 @@ const SHARE_MAX_ITEMS = 300;
 const SUPABASE_URL = cleanEnvValue(process.env.SUPABASE_URL || "");
 const SUPABASE_SERVICE_ROLE_KEY = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || "");
 const SUPABASE_STORAGE_BUCKET = cleanEnvValue(process.env.SUPABASE_STORAGE_BUCKET || "magx-assets");
+const PUBLIC_APP_ORIGIN = cleanEnvValue(
+  process.env.MAGX_PUBLIC_ORIGIN || process.env.PUBLIC_APP_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL || ""
+);
 const APP_ADMIN_EMAILS = new Set(
   (cleanEnvValue(process.env.APP_ADMIN_EMAILS || "kipme001@gmail.com") || "")
     .split(",")
@@ -96,8 +99,26 @@ function persistShareStore() {
   }
 }
 
+function normalizeAbsoluteOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "";
+  }
+}
+
 function buildRequestOrigin(req) {
+  const explicitOrigin = normalizeAbsoluteOrigin(PUBLIC_APP_ORIGIN);
+  if (explicitOrigin) return explicitOrigin;
   const host = String(req.headers.host || `127.0.0.1:${PORT}`);
+  if (/-projects\.vercel\.app$/i.test(host)) {
+    // Force canonical app host for share links generated from protected Vercel preview hosts.
+    return "https://mag-x.vercel.app";
+  }
   const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
   const proto = forwardedProto || "http";
   return `${proto}://${host}`;
