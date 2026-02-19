@@ -5652,6 +5652,12 @@ function bindPreviewMessageListener() {
 function buildPageTurnPreviewHtml() {
   persistCurrentPageState();
   ensureInheritedViewsUpToDate();
+  const currentUrlParams = new URLSearchParams(window.location.search);
+  const currentShareId = String(currentUrlParams.get("share") || "").trim();
+  const shareUrlHint =
+    (currentShareId
+      ? `${window.location.origin}/editor?share=${encodeURIComponent(currentShareId)}&preview=1`
+      : normalizeShareLinkInput(shareLinkField?.value || "")) || "";
   const pages = state.pages.map((page, index) => {
     const viewKey = page.currentView || "desktop";
     const viewState = page.viewStates?.[viewKey] || createDefaultViewState(viewKey);
@@ -5669,6 +5675,7 @@ function buildPageTurnPreviewHtml() {
   const maxWidth = Math.max(...pages.map((page) => page.canvas.width), 1);
   const maxHeight = Math.max(...pages.map((page) => page.canvas.height), 1);
   const payload = JSON.stringify({ pages, maxWidth, maxHeight }).replace(/</g, "\\u003c");
+  const shareUrlHintJson = JSON.stringify(shareUrlHint).replace(/</g, "\\u003c");
 
   return `<!doctype html>
 <html lang="en">
@@ -5772,6 +5779,7 @@ function buildPageTurnPreviewHtml() {
   </div>
   <script type="application/json" id="previewData">${payload}</script>
   <script>
+    const shareUrlHint = ${shareUrlHintJson};
     const data = JSON.parse(document.getElementById("previewData").textContent || "{}");
     const pages = Array.isArray(data.pages) ? data.pages : [];
     const stage = document.getElementById("stage");
@@ -6009,10 +6017,23 @@ function buildPageTurnPreviewHtml() {
       window.opener.postMessage({ type: "${PREVIEW_DOWNLOAD_PDF_MESSAGE}" }, window.location.origin);
     });
     embedCodeBtn?.addEventListener("click", () => {
-      if (!window.opener) return;
       if (embedCodeBtn.disabled) return;
-      embedCodeBtn.disabled = true;
-      window.opener.postMessage({ type: "${PREVIEW_COPY_EMBED_MESSAGE}" }, window.location.origin);
+      if (window.opener) {
+        embedCodeBtn.disabled = true;
+        window.opener.postMessage({ type: "${PREVIEW_COPY_EMBED_MESSAGE}" }, window.location.origin);
+        return;
+      }
+      const url = String(shareUrlHint || "").trim();
+      if (!url) {
+        alert("Embed code unavailable for this preview.");
+        return;
+      }
+      const code = '<iframe src="' + url + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
+      navigator.clipboard.writeText(code).then(() => {
+        alert("Embed code copied.");
+      }).catch(() => {
+        window.prompt("Copy embed code:", code);
+      });
     });
     viewModeBtn?.addEventListener("click", () => {
       viewMode = viewMode === "spread" ? "single" : "spread";
@@ -6102,7 +6123,7 @@ function buildPageTurnPreviewHtml() {
     });
     window.addEventListener("resize", scheduleCenterBookInView);
     if (!window.opener && downloadPdfBtn) downloadPdfBtn.disabled = true;
-    if (!window.opener && embedCodeBtn) embedCodeBtn.disabled = true;
+    if (!window.opener && embedCodeBtn) embedCodeBtn.disabled = !String(shareUrlHint || "").trim();
 
     updateViewModeButton();
     renderSpread();
