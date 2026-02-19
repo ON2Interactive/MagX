@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact - DarkroomX</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/darkroomx-favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="common-page">
+    <main class="common-shell">
+      <header class="landing-nav">
+        <a class="landing-brand" href="/" aria-label="DarkroomX Home">
+          <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-brand-logo" />
+        </a>
+        <nav class="landing-nav-links" aria-label="Primary">
+          <a href="/pricing">Pricing</a>
+          <a class="landing-cta-link" href="/signup">Try for Free</a>
+        </nav>
+      </header>
+
+      <section class="common-blank-section" aria-label="Contact page content">
+        <div class="common-page-inner">
+          <h1>Contact</h1>
+          <div class="contact-form-wrap">
+            <p class="contact-form-intro">Questions, feedback, or support requests. Send us a message.</p>
+            <form id="contactForm" class="contact-form" novalidate>
+              <input id="contactHoneypot" name="company" type="text" autocomplete="off" tabindex="-1" class="contact-hp" />
+              <label for="contactName">Name</label>
+              <input id="contactName" name="name" type="text" maxlength="120" required />
+
+              <label for="contactEmail">Email</label>
+              <input id="contactEmail" name="email" type="email" maxlength="180" required />
+
+              <label for="contactSubject">Subject</label>
+              <input id="contactSubject" name="subject" type="text" maxlength="160" required />
+
+              <label for="contactMessage">Message</label>
+              <textarea id="contactMessage" name="message" maxlength="4000" rows="8" required></textarea>
+
+              <button id="contactSubmit" type="submit" class="contact-submit-btn">Send Message</button>
+              <p id="contactStatus" class="contact-status" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer" aria-label="DarkroomX footer">
+        <div class="landing-footer-inner">
+          <div class="landing-footer-top">
+            <a class="landing-footer-logo-link" href="/" aria-label="DarkroomX Home">
+              <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-footer-logo" />
+            </a>
+            <nav class="landing-footer-links" aria-label="Footer">
+              <a href="/signup">Sign Up</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/faqs">FAQs</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </nav>
+          </div>
+          <div class="landing-footer-bottom">
+            <p>© <span id="footerYear"></span> DarkroomX. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </main>
+    <script>
+      (() => {
+        const nav = document.querySelector(".landing-nav");
+        if (!nav) return;
+
+        let lastScrollY = window.scrollY || 0;
+        const delta = 8;
+        const topRevealThreshold = 80;
+
+        const onScroll = () => {
+          const currentY = window.scrollY || 0;
+          const diff = currentY - lastScrollY;
+
+          if (currentY <= topRevealThreshold) {
+            nav.classList.remove("is-hidden");
+            lastScrollY = currentY;
+            return;
+          }
+
+          if (Math.abs(diff) < delta) return;
+
+          if (diff > 0) {
+            nav.classList.add("is-hidden");
+          } else {
+            nav.classList.remove("is-hidden");
+          }
+
+          lastScrollY = currentY;
+        };
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+
+        const footerYear = document.getElementById("footerYear");
+        if (footerYear) {
+          footerYear.textContent = String(new Date().getFullYear());
+        }
+
+        const form = document.getElementById("contactForm");
+        const statusEl = document.getElementById("contactStatus");
+        const submitBtn = document.getElementById("contactSubmit");
+        const honeypot = document.getElementById("contactHoneypot");
+        let recaptchaSiteKey = "";
+        let recaptchaAction = "contact_submit";
+        let recaptchaReadyPromise = Promise.resolve();
+
+        const loadRecaptchaScript = (siteKey) =>
+          new Promise((resolve, reject) => {
+            if (window.grecaptcha && typeof window.grecaptcha.ready === "function") {
+              window.grecaptcha.ready(resolve);
+              return;
+            }
+            const existing = document.querySelector('script[data-recaptcha="true"]');
+            if (existing) {
+              existing.addEventListener("load", () => window.grecaptcha?.ready(resolve), { once: true });
+              existing.addEventListener("error", reject, { once: true });
+              return;
+            }
+            const script = document.createElement("script");
+            script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
+            script.async = true;
+            script.defer = true;
+            script.dataset.recaptcha = "true";
+            script.addEventListener("load", () => {
+              if (!window.grecaptcha || typeof window.grecaptcha.ready !== "function") {
+                reject(new Error("reCAPTCHA failed to load."));
+                return;
+              }
+              window.grecaptcha.ready(resolve);
+            });
+            script.addEventListener("error", () => reject(new Error("reCAPTCHA failed to load.")));
+            document.head.appendChild(script);
+          });
+
+        fetch("/api/recaptcha/site-key")
+          .then((response) => response.json())
+          .then((payload) => {
+            const siteKey = String(payload?.siteKey || "").trim();
+            if (!siteKey) return;
+            recaptchaSiteKey = siteKey;
+            recaptchaAction = String(payload?.action || "contact_submit");
+            recaptchaReadyPromise = loadRecaptchaScript(siteKey);
+          })
+          .catch(() => {});
+
+        if (form && statusEl && submitBtn) {
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const name = String(document.getElementById("contactName")?.value || "").trim();
+            const email = String(document.getElementById("contactEmail")?.value || "").trim();
+            const subject = String(document.getElementById("contactSubject")?.value || "").trim();
+            const message = String(document.getElementById("contactMessage")?.value || "").trim();
+            const company = String(honeypot?.value || "").trim();
+
+            if (!name || !email || !subject || !message) {
+              statusEl.textContent = "Please complete all fields.";
+              return;
+            }
+
+            submitBtn.disabled = true;
+            statusEl.textContent = "Sending...";
+
+            try {
+              let recaptchaToken = "";
+              if (recaptchaSiteKey) {
+                await recaptchaReadyPromise;
+                if (!window.grecaptcha || typeof window.grecaptcha.execute !== "function") {
+                  statusEl.textContent = "Security check failed to initialize. Please refresh and try again.";
+                  return;
+                }
+                recaptchaToken = await window.grecaptcha.execute(recaptchaSiteKey, { action: recaptchaAction });
+              }
+
+              const response = await fetch("/api/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email, subject, message, company, recaptchaToken }),
+              });
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                statusEl.textContent = payload?.error || "Unable to send message.";
+                return;
+              }
+              form.reset();
+              statusEl.textContent = "Message sent. We will get back to you soon.";
+            } catch {
+              statusEl.textContent = "Network error. Please try again.";
+            } finally {
+              submitBtn.disabled = false;
+            }
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

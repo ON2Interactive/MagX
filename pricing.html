@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pricing - DarkroomX</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/darkroomx-favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="common-page">
+    <main class="common-shell">
+      <header class="landing-nav">
+        <a class="landing-brand" href="/" aria-label="DarkroomX Home">
+          <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-brand-logo" />
+        </a>
+        <nav class="landing-nav-links" aria-label="Primary">
+          <a href="/pricing">Pricing</a>
+          <a class="landing-cta-link" href="/signup">Try for Free</a>
+        </nav>
+      </header>
+
+      <section class="landing-pricing" aria-label="DarkroomX pricing">
+        <div class="landing-pricing-inner">
+          <div class="landing-pricing-copy">
+            <h1>Pricing</h1>
+            <p>One simple plan. Full access. Top up credits only when you need more AI generations.</p>
+            <button id="pricingManageBillingBtn" class="landing-pricing-manage-btn" type="button" hidden>Manage Billing</button>
+          </div>
+
+          <div class="landing-pricing-layout">
+            <article class="landing-pricing-card landing-pricing-single-card is-featured">
+              <h3>DarkroomX Pro</h3>
+              <div class="landing-pricing-price">$14.99<span>/month</span></div>
+              <div class="landing-pricing-credits">Credits top-up: $25 for 100 credits</div>
+              <ul>
+                <li>1 credit = 1 AI generation (4K)</li>
+                <li>AI image edits use credits</li>
+                <li>Exports are included</li>
+                <li>Manual edits are free</li>
+              </ul>
+              <p class="landing-pricing-note">Start with a free trial, then subscribe to keep full access. Top up credits as needed.</p>
+              <div class="landing-pricing-actions">
+                <a href="#" id="pricingSubscribeBtn" class="landing-pricing-btn">Start Free Trial</a>
+              </div>
+            </article>
+
+            <aside class="pricing-slideshow" aria-label="DarkroomX gallery preview">
+              <div class="pricing-slideshow-track" id="pricingSlideshowTrack">
+                <img class="pricing-slide is-active" src="/assets/slideshow/02.jpeg" alt="DarkroomX example image 02" loading="eager" decoding="async" />
+                <img class="pricing-slide" src="/assets/slideshow/07.jpeg" alt="DarkroomX example image 07" loading="lazy" decoding="async" />
+                <img class="pricing-slide" src="/assets/slideshow/08.jpeg" alt="DarkroomX example image 08" loading="lazy" decoding="async" />
+                <img class="pricing-slide" src="/assets/slideshow/09.jpeg" alt="DarkroomX example image 09" loading="lazy" decoding="async" />
+              </div>
+              <div class="pricing-slideshow-dots" id="pricingSlideshowDots" aria-hidden="true">
+                <span class="is-active"></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer" aria-label="DarkroomX footer">
+        <div class="landing-footer-inner">
+          <div class="landing-footer-top">
+            <a class="landing-footer-logo-link" href="/" aria-label="DarkroomX Home">
+              <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-footer-logo" />
+            </a>
+            <nav class="landing-footer-links" aria-label="Footer">
+              <a href="/signup">Sign Up</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/faqs">FAQs</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </nav>
+          </div>
+          <div class="landing-footer-bottom">
+            <p>© <span id="footerYear"></span> DarkroomX. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </main>
+    <script>
+      (() => {
+        const nav = document.querySelector(".landing-nav");
+        if (!nav) return;
+
+        let lastScrollY = window.scrollY || 0;
+        const delta = 8;
+        const topRevealThreshold = 80;
+
+        const onScroll = () => {
+          const currentY = window.scrollY || 0;
+          const diff = currentY - lastScrollY;
+
+          if (currentY <= topRevealThreshold) {
+            nav.classList.remove("is-hidden");
+            lastScrollY = currentY;
+            return;
+          }
+
+          if (Math.abs(diff) < delta) return;
+
+          if (diff > 0) {
+            nav.classList.add("is-hidden");
+          } else {
+            nav.classList.remove("is-hidden");
+          }
+
+          lastScrollY = currentY;
+        };
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+
+        const footerYear = document.getElementById("footerYear");
+        if (footerYear) {
+          footerYear.textContent = String(new Date().getFullYear());
+        }
+
+        const getAuthToken = () => {
+          try {
+            return String(window.localStorage.getItem("darkroomx_auth_token") || "").trim();
+          } catch {
+            return "";
+          }
+        };
+
+        const postCheckout = async (endpoint) => {
+          const token = getAuthToken();
+          if (!token) {
+            window.location.href = "/signup";
+            return;
+          }
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: "{}",
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload?.error || "Unable to start checkout.");
+          }
+          const checkoutUrl = String(payload?.checkoutUrl || "");
+          if (!checkoutUrl) throw new Error("Missing checkout URL.");
+          window.location.href = checkoutUrl;
+        };
+
+        const openBillingPortal = async () => {
+          const token = getAuthToken();
+          if (!token) {
+            window.location.href = "/signup";
+            return;
+          }
+          const response = await fetch("/api/stripe/billing-portal", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: "{}",
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload?.error || "Unable to open billing portal.");
+          }
+          const portalUrl = String(payload?.portalUrl || "");
+          if (!portalUrl) throw new Error("Missing billing portal URL.");
+          window.location.href = portalUrl;
+        };
+
+        const loadAccessStatus = async () => {
+          const token = getAuthToken();
+          if (!token) return null;
+          const response = await fetch("/api/access/status", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (!response.ok) return null;
+          return response.json().catch(() => null);
+        };
+
+        const subscribeBtn = document.getElementById("pricingSubscribeBtn");
+        const manageBillingBtn = document.getElementById("pricingManageBillingBtn");
+
+        const bindCheckout = (button, endpoint) => {
+          if (!button) return;
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            button.setAttribute("aria-disabled", "true");
+            try {
+              await postCheckout(endpoint);
+            } catch (error) {
+              window.alert(error?.message || "Unable to open checkout.");
+            } finally {
+              button.removeAttribute("aria-disabled");
+            }
+          });
+        };
+
+        bindCheckout(subscribeBtn, "/api/stripe/checkout/subscription");
+
+        const slideshowTrack = document.getElementById("pricingSlideshowTrack");
+        const slideEls = slideshowTrack ? Array.from(slideshowTrack.querySelectorAll(".pricing-slide")) : [];
+        const dotWrap = document.getElementById("pricingSlideshowDots");
+        const dotEls = dotWrap ? Array.from(dotWrap.querySelectorAll("span")) : [];
+        let activeSlide = 0;
+        let slideTimer = null;
+
+        const setActiveSlide = (index) => {
+          if (!slideEls.length) return;
+          activeSlide = (index + slideEls.length) % slideEls.length;
+          slideEls.forEach((slide, i) => {
+            slide.classList.toggle("is-active", i === activeSlide);
+          });
+          dotEls.forEach((dot, i) => {
+            dot.classList.toggle("is-active", i === activeSlide);
+          });
+        };
+
+        const startSlideShow = () => {
+          if (slideEls.length <= 1) return;
+          if (slideTimer) window.clearInterval(slideTimer);
+          slideTimer = window.setInterval(() => {
+            setActiveSlide(activeSlide + 1);
+          }, 4200);
+        };
+
+        startSlideShow();
+        loadAccessStatus()
+          .then((status) => {
+            if (!manageBillingBtn) return;
+            const hasActiveSubscription = Boolean(status?.subscriptionActive);
+            manageBillingBtn.hidden = !hasActiveSubscription;
+          })
+          .catch(() => {
+            if (!manageBillingBtn) return;
+            manageBillingBtn.hidden = true;
+          });
+        if (manageBillingBtn) {
+          manageBillingBtn.addEventListener("click", async () => {
+            manageBillingBtn.disabled = true;
+            try {
+              await openBillingPortal();
+            } catch (error) {
+              window.alert(error?.message || "Unable to open billing portal.");
+            } finally {
+              manageBillingBtn.disabled = false;
+            }
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

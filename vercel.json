@@ -10,15 +10,15 @@
       "use": "@vercel/static"
     },
     {
-      "src": "studio.html",
+      "src": "editor.html",
       "use": "@vercel/static"
     },
     {
-      "src": "app.js",
+      "src": "editor.js",
       "use": "@vercel/static"
     },
     {
-      "src": "styles.css",
+      "src": "editor.css",
       "use": "@vercel/static"
     },
     {
@@ -36,11 +36,11 @@
       "dest": "/index.html"
     },
     {
-      "src": "/studio",
-      "dest": "/studio.html"
+      "src": "/(magx|editor)",
+      "dest": "/editor.html"
     },
     {
-      "src": "/(app\\.js|styles\\.css|studio\\.html|favicon\\.ico|.*\\.(png|jpg|jpeg|svg|webp|gif))",
+      "src": "/(editor\\.js|editor\\.css|editor\\.html|favicon\\.ico|.*\\.(png|jpg|jpeg|svg|webp|gif))",
       "dest": "/$1"
     },
     {

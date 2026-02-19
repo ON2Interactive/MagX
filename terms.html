@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terms of Use - DarkroomX</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/darkroomx-favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="common-page">
+    <main class="common-shell">
+      <header class="landing-nav">
+        <a class="landing-brand" href="/" aria-label="DarkroomX Home">
+          <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-brand-logo" />
+        </a>
+        <nav class="landing-nav-links" aria-label="Primary">
+          <a href="/pricing">Pricing</a>
+          <a class="landing-cta-link" href="/signup">Try for Free</a>
+        </nav>
+      </header>
+
+      <section class="common-blank-section" aria-label="Terms page content">
+        <div class="common-page-inner common-page-inner-legal">
+          <h1>Terms of Use</h1>
+          <div class="legal-content">
+            <p><strong>Last Updated:</strong> Feb 14, 2026</p>
+
+            <p>
+              Welcome to DarkroomX! By accessing or using our website and services, you agree to be bound by these Terms
+              of Use. If you do not agree with any part of these terms, please do not use the service.
+            </p>
+
+            <h2>1. Overview</h2>
+            <p>
+              DarkroomX is an AI-powered photo editing platform that allows users to upload images and generate edits
+              through natural language input. By using the platform, you agree to use it responsibly and in accordance
+              with applicable laws.
+            </p>
+
+            <h2>2. User Conduct</h2>
+            <p>You agree not to:</p>
+            <ul>
+              <li>Upload or generate content that is unlawful, harmful, offensive, or infringes on any third-party rights.</li>
+              <li>Use the platform to create misleading, deceptive, or manipulated content that could cause harm or misrepresentation.</li>
+              <li>Attempt to reverse-engineer or interfere with the service or its functionality.</li>
+            </ul>
+
+            <h2>3. Account Responsibility</h2>
+            <p>
+              If you create an account, you are responsible for maintaining its security and for all activity that
+              occurs under your login.
+            </p>
+
+            <h2>4. Intellectual Property</h2>
+            <p>
+              All content generated using DarkroomX is owned by you, the user, unless otherwise stated. However, the
+              DarkroomX platform, branding, and underlying technologies are owned by the company and may not be copied,
+              resold, or used without permission.
+            </p>
+
+            <h2>5. Disclaimer on Image Accuracy</h2>
+            <p>
+              DarkroomX uses AI to generate photo edits based on natural language descriptions. While we aim to preserve
+              the original elements of the uploaded image, the final results may include subtle or significant alterations,
+              enhancements, or reinterpretations of visual content.
+            </p>
+            <p>
+              We do not guarantee that the edited output will exactly match the uploaded photo or the user’s intent in
+              every case. By using the service, you acknowledge and accept this creative variability inherent to
+              AI-powered editing.
+            </p>
+
+            <h2>6. Limitation of Liability</h2>
+            <p>
+              DarkroomX is provided “as is” without warranties of any kind. We are not liable for any direct, indirect,
+              incidental, or consequential damages arising from your use of the service, including loss of data or images.
+            </p>
+
+            <h2>7. Service Availability</h2>
+            <p>
+              We may update, modify, or suspend features of the platform at any time without notice. We are not
+              responsible for outages, delays, or service interruptions.
+            </p>
+
+            <h2>8. Termination</h2>
+            <p>
+              We reserve the right to suspend or terminate access to DarkroomX for any reason, including violation of
+              these terms.
+            </p>
+
+            <h2>9. Privacy</h2>
+            <p>
+              Your use of DarkroomX is also governed by our <a href="/privacy">Privacy Policy</a>, which explains how
+              we handle your data, including uploaded images.
+            </p>
+
+            <h2>10. Changes to Terms</h2>
+            <p>
+              We may revise these terms at any time. Continued use of the platform after changes are posted means you
+              accept the revised terms.
+            </p>
+
+            <h2>11. Contact</h2>
+            <p>
+              If you have any questions about these Terms of Use, please contact us at:
+              <a href="/contact">www.darkroomx.com/contact</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer" aria-label="DarkroomX footer">
+        <div class="landing-footer-inner">
+          <div class="landing-footer-top">
+            <a class="landing-footer-logo-link" href="/" aria-label="DarkroomX Home">
+              <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-footer-logo" />
+            </a>
+            <nav class="landing-footer-links" aria-label="Footer">
+              <a href="/signup">Sign Up</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/faqs">FAQs</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </nav>
+          </div>
+          <div class="landing-footer-bottom">
+            <p>© <span id="footerYear"></span> DarkroomX. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </main>
+    <script>
+      (() => {
+        const nav = document.querySelector(".landing-nav");
+        if (!nav) return;
+
+        let lastScrollY = window.scrollY || 0;
+        const delta = 8;
+        const topRevealThreshold = 80;
+
+        const onScroll = () => {
+          const currentY = window.scrollY || 0;
+          const diff = currentY - lastScrollY;
+
+          if (currentY <= topRevealThreshold) {
+            nav.classList.remove("is-hidden");
+            lastScrollY = currentY;
+            return;
+          }
+
+          if (Math.abs(diff) < delta) return;
+
+          if (diff > 0) {
+            nav.classList.add("is-hidden");
+          } else {
+            nav.classList.remove("is-hidden");
+          }
+
+          lastScrollY = currentY;
+        };
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+
+        const footerYear = document.getElementById("footerYear");
+        if (footerYear) {
+          footerYear.textContent = String(new Date().getFullYear());
+        }
+      })();
+    </script>
+  </body>
+</html>

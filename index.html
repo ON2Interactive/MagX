@@ -3,30 +3,291 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DarkroomX</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/darkroomx-favicon.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <title>MagX</title>
+    <style>
+      :root {
+        --bg: #1a1a1a;
+        --text: #f2f2f2;
+        --text-muted: #d4d4d4;
+        --line: rgba(242, 242, 242, 0.15);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html, body {
+        margin: 0;
+        width: 100%;
+      }
+      body {
+        font-family: "Helvetica", "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--text);
+        background-color: var(--bg);
+        background-image:
+          linear-gradient(rgba(242, 242, 242, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(242, 242, 242, 0.035) 1px, transparent 1px);
+        background-size: 18px 18px;
+      }
+      .page {
+        min-height: 100vh;
+      }
+      .nav {
+        width: 100%;
+        height: 60px;
+        background-color: var(--bg);
+        background-image:
+          linear-gradient(rgba(242, 242, 242, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(242, 242, 242, 0.035) 1px, transparent 1px);
+        background-size: 18px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .nav-inner {
+        width: 100%;
+        padding: 0 20px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .hero-inner {
+        width: 100%;
+        max-width: 1200px;
+        padding: 0 20px;
+        margin: 0 auto;
+      }
+      .hero-copy {
+        max-width: 1060px;
+        margin: 0 auto;
+        text-align: left;
+      }
+      .logo {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+      .nav-cta {
+        color: var(--text);
+        text-decoration: none;
+        font-size: 15px;
+      }
+      .hero {
+        min-height: 800px;
+        display: flex;
+        align-items: center;
+      }
+      .section-blank {
+        min-height: 600px;
+        background-color: var(--bg);
+        background-image: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+      .section-blank-inner {
+        width: 100%;
+        max-width: 1200px;
+      }
+      .section-blank-inner img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .landing-footer {
+        background-color: #131313;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+        background-size: 24px 24px;
+        background-position: 0 0, 0 0;
+        min-height: 600px;
+        padding: 50px 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .landing-footer-inner {
+        width: min(1400px, 100%);
+        margin: 0 auto;
+        min-height: calc(600px - 136px);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .landing-footer-top {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 20px;
+        width: 100%;
+        padding-bottom: 24px;
+        margin-bottom: 24px;
+      }
+      .landing-footer-logo-link {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+      .landing-footer-logo {
+        display: block;
+        width: 200px;
+        max-width: 100%;
+        height: auto;
+      }
+      .landing-footer-links {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 12px;
+        text-align: right;
+      }
+      .landing-footer-links a {
+        color: rgba(255, 255, 255, 0.78);
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .landing-footer-links a:hover {
+        color: rgba(255, 255, 255, 0.64);
+      }
+      .landing-footer-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
+        width: 100%;
+      }
+      .landing-footer-bottom p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.92rem;
+        text-align: right;
+      }
+      h1,
+      h2 {
+        margin: 0;
+        font-weight: 500;
+      }
+      h1 {
+        font-size: 70px;
+        font-weight: 700;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        max-width: 100%;
+        margin: 0;
+        text-align: left;
+        white-space: normal;
+        color: transparent;
+        background: linear-gradient(180deg, #2f56ff 0%, #4e43c8 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+      }
+      h2 {
+        margin-top: 18px;
+        font-size: 24px;
+        line-height: 1.25;
+        color: var(--text-muted);
+        max-width: 100%;
+        text-align: left;
+      }
+      p {
+        margin: 26px 0 0;
+        font-size: 15px;
+        color: var(--text-muted);
+        max-width: 100%;
+        text-align: center;
+      }
+      .hero-cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 28px;
+        min-width: 230px;
+        height: 52px;
+        border: 2px solid rgba(242, 242, 242, 0.82);
+        border-radius: 12px;
+        text-decoration: none;
+        color: var(--text);
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .hero-copy .hero-cta {
+        display: flex;
+        width: fit-content;
+        margin-left: 0;
+        margin-right: 0;
+      }
+      @media (max-width: 992px) {
+        .hero-copy {
+          max-width: 100%;
+        }
+        h1 {
+          font-size: 36px;
+        }
+      }
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 24px;
+        }
+        h2 {
+          font-size: 22px;
+        }
+      }
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 24px;
+        }
+      }
+    </style>
   </head>
-  <body class="landing-page">
-    <main class="landing-shell">
-      <header class="landing-nav">
-        <a class="landing-brand" href="/" aria-label="DarkroomX Home">
-          <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="landing-brand-logo" />
-        </a>
-        <nav class="landing-nav-links" aria-label="Primary">
-          <a href="#pricing">Pricing</a>
-          <a class="landing-cta-link" href="/studio">Try for Free</a>
-        </nav>
+  <body>
+    <div class="page">
+      <header class="nav">
+        <div class="nav-inner">
+          <div class="logo">MagX</div>
+          <a class="nav-cta" href="/editor">Try for Free</a>
+        </div>
       </header>
-
-      <section class="landing-hero" role="img" aria-label="DarkroomX hero image">
-        <div class="landing-overlay"></div>
-        <div class="landing-hero-copy">
-          <h1>Edit. Generate. Reimagine.</h1>
-          <h2>A modern photo editor powered by AI.</h2>
-          <p>Precise Edits to AI-Generated Visuals - ready for Screen or Print</p>
+      <main class="hero">
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <h1>Visually Create Unique Designs for Codex-AntiGravity and many more Vibe Coding Tools</h1>
+            <a class="hero-cta" href="/editor">Try for Free</a>
+          </div>
+        </div>
+      </main>
+      <section class="section-blank">
+        <div class="section-blank-inner">
+          <img src="assets/Screenshots/LP-App_Image.png" alt="MagX app preview" />
         </div>
       </section>
-    </main>
+      <footer class="landing-footer" aria-label="MagX footer">
+        <div class="landing-footer-inner">
+          <div class="landing-footer-top">
+            <a class="landing-footer-logo-link" href="/" aria-label="MagX Home">
+              <img src="/assets/darkroomx-logo-white.svg" alt="MagX" class="landing-footer-logo" />
+            </a>
+            <nav class="landing-footer-links" aria-label="Footer">
+              <a href="/signup">Sign Up</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/faqs">FAQs</a>
+              <a href="/help">Help</a>
+              <a href="/contact">Contact</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </nav>
+          </div>
+          <div class="landing-footer-bottom">
+            <p>© <span id="footerYear"></span> MagX. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script>
+      (() => {
+        const footerYear = document.getElementById("footerYear");
+        if (footerYear) footerYear.textContent = String(new Date().getFullYear());
+      })();
+    </script>
   </body>
 </html>

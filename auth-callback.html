@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signing In - DarkroomX</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/darkroomx-favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      body.auth-callback-page {
+        margin: 0;
+        background: #050505;
+        color: #f4f4f4;
+      }
+
+      .auth-callback-shell {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+      }
+
+      .auth-callback-shell.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body class="signup-page auth-callback-page">
+    <main class="signup-shell auth-callback-shell" id="authCallbackShell">
+      <section class="signup-card" aria-label="Auth callback">
+        <img src="/assets/darkroomx-logo-white.svg" alt="DarkroomX" class="signup-logo" />
+        <h1>Signing you in...</h1>
+        <p id="authCallbackStatus">Finalizing account setup.</p>
+        <a class="signup-back" href="/signup">Back to Sign Up</a>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const shellEl = document.getElementById("authCallbackShell");
+        const statusEl = document.getElementById("authCallbackStatus");
+
+        const showCallbackUi = () => {
+          if (shellEl) shellEl.classList.add("is-visible");
+        };
+
+        const updateStatus = (message) => {
+          if (statusEl) statusEl.textContent = String(message || "");
+        };
+
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const queryParams = new URLSearchParams(window.location.search || "");
+        const oauthError = hashParams.get("error_description") || hashParams.get("error") || queryParams.get("error_description") || queryParams.get("error");
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        const expiresIn = Number(hashParams.get("expires_in") || "0");
+        const expiresAt = Number(hashParams.get("expires_at") || "0");
+
+        if (oauthError) {
+          showCallbackUi();
+          updateStatus(`Sign-in failed: ${oauthError}`);
+          return;
+        }
+
+        if (!accessToken) {
+          showCallbackUi();
+          updateStatus("Missing auth token. Please try signing in again.");
+          return;
+        }
+
+        updateStatus("Creating your DarkroomX profile...");
+        fetch("/api/auth/bootstrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken }),
+        })
+          .then(async (response) => {
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload?.error || "Unable to complete sign-in.");
+            }
+
+            // Keep lightweight client context for future user-aware UI work.
+            window.localStorage.setItem("darkroomx_auth_token", accessToken);
+            window.localStorage.setItem("darkroomx_app_session_started_at", String(Date.now()));
+            if (refreshToken) {
+              window.localStorage.setItem("darkroomx_refresh_token", refreshToken);
+            }
+            if (Number.isFinite(expiresAt) && expiresAt > 0) {
+              window.localStorage.setItem("darkroomx_auth_expires_at", String(expiresAt * 1000));
+            } else if (Number.isFinite(expiresIn) && expiresIn > 0) {
+              window.localStorage.setItem("darkroomx_auth_expires_at", String(Date.now() + expiresIn * 1000));
+            }
+            if (payload?.profile) {
+              window.localStorage.setItem("darkroomx_profile", JSON.stringify(payload.profile));
+              const profileCredits = Number(payload?.profile?.creditsBalance);
+              if (Number.isFinite(profileCredits) && profileCredits >= 0) {
+                window.localStorage.setItem("darkroomx_credits", String(Math.floor(profileCredits)));
+              }
+            }
+            if (payload?.activeProject?.id) {
+              window.localStorage.setItem("darkroomx_active_project_id", payload.activeProject.id);
+            }
+
+            window.location.replace(payload?.redirectTo || "/pricing");
+          })
+          .catch((error) => {
+            showCallbackUi();
+            updateStatus(error?.message || "Unable to complete sign-in.");
+          });
+      })();
+    </script>
+  </body>
+</html>

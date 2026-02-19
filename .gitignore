@@ -1,1 +1,6 @@
 .env
+.DS_Store
+node_modules/
+.magx-shares.json
+magx-export/
+*.zip
