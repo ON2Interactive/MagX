@@ -2316,11 +2316,14 @@ function getUtf8ByteLength(value) {
   }
 }
 
-async function optimizeShareImageSource(src) {
+async function optimizeShareImageSource(src, options = {}) {
   const value = String(src || "");
   if (!value.startsWith("data:image/")) return value;
+  const maxBytes = Number(options.maxBytes) || 1_400_000;
+  const maxDimension = Math.max(256, Number(options.maxDimension) || 1600);
+  const quality = Math.min(0.95, Math.max(0.4, Number(options.quality) || 0.82));
   const currentBytes = getUtf8ByteLength(value);
-  if (currentBytes <= 1_400_000) return value;
+  if (currentBytes <= maxBytes) return value;
 
   const image = await new Promise((resolve) => {
     const img = new Image();
@@ -2334,7 +2337,6 @@ async function optimizeShareImageSource(src) {
   const sourceHeight = Number(image.naturalHeight || image.height || 0);
   if (!sourceWidth || !sourceHeight) return value;
 
-  const maxDimension = 1600;
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
   const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
@@ -2349,13 +2351,13 @@ async function optimizeShareImageSource(src) {
 
   let optimized = "";
   try {
-    optimized = canvasEl.toDataURL("image/webp", 0.82);
+    optimized = canvasEl.toDataURL("image/webp", quality);
   } catch {
     optimized = "";
   }
   if (!optimized.startsWith("data:image/")) {
     try {
-      optimized = canvasEl.toDataURL("image/jpeg", 0.82);
+      optimized = canvasEl.toDataURL("image/jpeg", quality);
     } catch {
       optimized = "";
     }
@@ -2366,6 +2368,7 @@ async function optimizeShareImageSource(src) {
 
 async function buildSharePayload() {
   const payload = cloneJson(buildProjectPayload());
+  const imageRefs = [];
   const stripFields = async (item) => {
     if (!item || typeof item !== "object") return item;
     const next = { ...item };
@@ -2373,7 +2376,8 @@ async function buildSharePayload() {
       delete next.aiVersionHistory;
       delete next.aiVersionIndex;
       if (typeof next.src === "string" && next.src.startsWith("data:image/")) {
-        next.src = await optimizeShareImageSource(next.src);
+        next.src = await optimizeShareImageSource(next.src, { maxBytes: 1_400_000, maxDimension: 1600, quality: 0.82 });
+        imageRefs.push(next);
       }
     }
     return next;
@@ -2393,6 +2397,25 @@ async function buildSharePayload() {
     nextPage.viewStates = viewStates;
     return nextPage;
   }));
+  const maxPayloadBytes = 8 * 1024 * 1024;
+  let bytes = getUtf8ByteLength(JSON.stringify(payload));
+  if (bytes > maxPayloadBytes && imageRefs.length > 0) {
+    const passes = [
+      { maxBytes: 1_000_000, maxDimension: 1400, quality: 0.76 },
+      { maxBytes: 750_000, maxDimension: 1200, quality: 0.7 },
+      { maxBytes: 500_000, maxDimension: 1000, quality: 0.64 },
+      { maxBytes: 320_000, maxDimension: 800, quality: 0.58 },
+    ];
+    for (const pass of passes) {
+      if (bytes <= maxPayloadBytes) break;
+      for (const imageRef of imageRefs) {
+        if (bytes <= maxPayloadBytes) break;
+        if (!imageRef || typeof imageRef.src !== "string" || !imageRef.src.startsWith("data:image/")) continue;
+        imageRef.src = await optimizeShareImageSource(imageRef.src, pass);
+        bytes = getUtf8ByteLength(JSON.stringify(payload));
+      }
+    }
+  }
   return payload;
 }
 
