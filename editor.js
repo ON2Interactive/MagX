@@ -2401,6 +2401,18 @@ async function buildSharePayload() {
     if (next.type === "image") {
       delete next.aiVersionHistory;
       delete next.aiVersionIndex;
+      // Shared preview is read-only; strip any non-render image blobs to keep share payload small.
+      Object.keys(next).forEach((key) => {
+        if (key === "src") return;
+        const value = next[key];
+        if (typeof value === "string" && value.startsWith("data:image/")) {
+          delete next[key];
+          return;
+        }
+        if (Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === "string" && entry.startsWith("data:image/"))) {
+          delete next[key];
+        }
+      });
       if (typeof next.src === "string" && next.src.startsWith("data:image/")) {
         next.src = await optimizeShareImageSource(next.src, { maxBytes: 1_400_000, maxDimension: 1600, quality: 0.82 });
         imageRefs.push(next);
