@@ -5562,6 +5562,8 @@ async function copyHtmlPackage() {
 
 const PREVIEW_DOWNLOAD_PDF_MESSAGE = "magx-preview-download-pdf";
 const PREVIEW_DOWNLOAD_PDF_RESULT_MESSAGE = "magx-preview-download-pdf-result";
+const PREVIEW_COPY_PREVIEW_LINK_MESSAGE = "magx-preview-copy-preview-link";
+const PREVIEW_COPY_PREVIEW_LINK_RESULT_MESSAGE = "magx-preview-copy-preview-link-result";
 const PREVIEW_COPY_EMBED_MESSAGE = "magx-preview-copy-embed";
 const PREVIEW_COPY_EMBED_RESULT_MESSAGE = "magx-preview-copy-embed-result";
 let activePreviewWindowRef = null;
@@ -5585,6 +5587,19 @@ async function copyPreviewEmbedCodeFromEditor() {
     const message = error?.message || "Could not create embed code.";
     setStatus(message);
     return { ok: false, message, embedCode: "" };
+  }
+}
+
+async function copyPreviewLinkFromEditor() {
+  try {
+    const shareUrl = await ensureShareLink();
+    const previewUrl = normalizeShareLinkInput(shareUrl) || shareUrl;
+    setStatus("Preview link ready.");
+    return { ok: true, message: "Preview link ready.", url: previewUrl };
+  } catch (error) {
+    const message = error?.message || "Could not create preview link.";
+    setStatus(message);
+    return { ok: false, message, url: "" };
   }
 }
 
@@ -5653,6 +5668,15 @@ function bindPreviewMessageListener() {
       result = await copyPreviewEmbedCodeFromEditor();
       try {
         event.source?.postMessage({ type: PREVIEW_COPY_EMBED_RESULT_MESSAGE, ...result }, event.origin);
+      } catch {
+        // Ignore response channel errors.
+      }
+      return;
+    }
+    if (event.data?.type === PREVIEW_COPY_PREVIEW_LINK_MESSAGE) {
+      result = await copyPreviewLinkFromEditor();
+      try {
+        event.source?.postMessage({ type: PREVIEW_COPY_PREVIEW_LINK_RESULT_MESSAGE, ...result }, event.origin);
       } catch {
         // Ignore response channel errors.
       }
@@ -6055,6 +6079,11 @@ function buildPageTurnPreviewHtml() {
       const currentHref = String(window.location.href || "").split("#")[0];
       const hasShareParam = /[?&]share=/.test(currentHref);
       const url = hasShareParam ? currentHref : String(shareUrlHint || "").trim();
+      if (!url && window.opener) {
+        sharePreviewBtn.disabled = true;
+        window.opener.postMessage({ type: "${PREVIEW_COPY_PREVIEW_LINK_MESSAGE}" }, window.location.origin);
+        return;
+      }
       if (!url) {
         alert("Preview link unavailable.");
         return;
@@ -6148,6 +6177,25 @@ function buildPageTurnPreviewHtml() {
           alert("Embed code copied.");
         } catch {
           window.prompt("Copy embed code:", code);
+        }
+        return;
+      }
+      if (event.data?.type === "${PREVIEW_COPY_PREVIEW_LINK_RESULT_MESSAGE}") {
+        if (sharePreviewBtn) sharePreviewBtn.disabled = false;
+        if (!event.data?.ok) {
+          alert(event.data?.message || "Could not create preview link.");
+          return;
+        }
+        const url = String(event.data?.url || "").trim();
+        if (!url) {
+          alert("Preview link unavailable.");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(url);
+          alert("Link copied.");
+        } catch {
+          window.prompt("Copy link:", url);
         }
       }
     });
