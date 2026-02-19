@@ -2465,7 +2465,10 @@ async function buildSharePayload() {
       const elements = Array.isArray(viewState.elements) ? viewState.elements : [];
       viewState.elements = await Promise.all(elements.map(stripFields));
     }));
-    nextPage.viewStates = viewStates;
+    // Keep only the active view for shared previews to avoid 3x payload bloat.
+    const activeViewKey = String(nextPage.currentView || "desktop");
+    const activeView = viewStates[activeViewKey] || viewStates.desktop || viewStates.tablet || viewStates.mobile;
+    nextPage.viewStates = activeView ? { [activeViewKey]: activeView } : {};
     return nextPage;
   }));
   const maxPayloadBytes = 8 * 1024 * 1024;
