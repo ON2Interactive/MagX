@@ -2316,6 +2316,32 @@ function getUtf8ByteLength(value) {
   }
 }
 
+function getOrCreateClientOwnerId() {
+  const storageKey = "magx_owner_id";
+  try {
+    const existing = String(window.localStorage.getItem(storageKey) || "").trim();
+    if (existing) return existing;
+  } catch {
+    // Ignore localStorage access errors.
+  }
+  const generated = (() => {
+    try {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return `usr_${window.crypto.randomUUID()}`;
+      }
+    } catch {
+      // Ignore and fallback.
+    }
+    return `usr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  })();
+  try {
+    window.localStorage.setItem(storageKey, generated);
+  } catch {
+    // Ignore localStorage write errors.
+  }
+  return generated;
+}
+
 async function optimizeShareImageSource(src, options = {}) {
   const value = String(src || "");
   if (!value.startsWith("data:image/")) return value;
@@ -2422,12 +2448,13 @@ async function buildSharePayload() {
 async function createShareLink() {
   setShareModalStatus("Preparing share link...");
   const payload = await buildSharePayload();
+  const ownerId = getOrCreateClientOwnerId();
   let response;
   try {
     response = await fetch("/api/share", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project: payload }),
+      body: JSON.stringify({ project: payload, ownerId }),
     });
   } catch (error) {
     const message = error?.message || "";

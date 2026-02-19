@@ -100,6 +100,13 @@ function createShareId() {
   return crypto.randomBytes(9).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function normalizeOwnerId(value) {
+  const raw = String(value || "").trim();
+  const safe = raw.replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!safe) return "";
+  return safe.slice(0, 128);
+}
+
 function hasSupabaseShareBackend() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && SUPABASE_STORAGE_BUCKET);
 }
@@ -250,6 +257,10 @@ function handleShareCreate(req, res) {
     try {
       const parsed = JSON.parse(raw || "{}");
       const project = parsed?.project || parsed;
+      const ownerId =
+        normalizeOwnerId(parsed?.ownerId) ||
+        normalizeOwnerId(req.headers["x-magx-owner-id"]) ||
+        `usr_${createShareId()}`;
       const validation = validateSharedProjectPayload(project);
       if (!validation.ok) {
         return sendJson(res, 400, { error: validation.error || "Invalid shared payload." });
@@ -262,9 +273,19 @@ function handleShareCreate(req, res) {
         const storagePath = `shares/${id}/project.json`;
         const body = Buffer.from(JSON.stringify(projectForStorage), "utf8");
         await supabaseStorageUpload(storagePath, body, "application/json; charset=utf-8");
+        const metaBody = Buffer.from(
+          JSON.stringify({
+            shareId: id,
+            ownerId,
+            createdAt: new Date(createdAt).toISOString(),
+          }),
+          "utf8"
+        );
+        await supabaseStorageUpload(`shares/${id}/meta.json`, metaBody, "application/json; charset=utf-8");
       } else {
         shareStore[id] = {
           createdAt,
+          ownerId,
           project,
         };
         pruneShareStore();
@@ -275,6 +296,7 @@ function handleShareCreate(req, res) {
       const shareUrl = `${origin}/preview?share=${encodeURIComponent(id)}`;
       return sendJson(res, 200, {
         id,
+        ownerId,
         url: shareUrl,
         createdAt: new Date(createdAt).toISOString(),
       });
@@ -302,9 +324,23 @@ function handleShareGet(req, res, shareId) {
         }
         const raw = await response.text();
         const project = JSON.parse(raw || "{}");
+        let ownerId = "";
+        let createdAt = new Date().toISOString();
+        try {
+          const metaResponse = await supabaseStorageDownload(`shares/${id}/meta.json`);
+          if (metaResponse.ok) {
+            const metaRaw = await metaResponse.text();
+            const meta = JSON.parse(metaRaw || "{}");
+            ownerId = normalizeOwnerId(meta?.ownerId);
+            if (meta?.createdAt) createdAt = new Date(meta.createdAt).toISOString();
+          }
+        } catch {
+          // Meta is optional; continue.
+        }
         return sendJson(res, 200, {
           id,
-          createdAt: new Date().toISOString(),
+          ownerId,
+          createdAt,
           project,
         });
       } catch (error) {
@@ -319,6 +355,7 @@ function handleShareGet(req, res, shareId) {
   }
   return sendJson(res, 200, {
     id,
+    ownerId: normalizeOwnerId(record.ownerId),
     createdAt: new Date(Number(record.createdAt || Date.now())).toISOString(),
     project: record.project,
   });
