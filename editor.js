@@ -2297,6 +2297,17 @@ function requireEditableStatus() {
   return false;
 }
 
+function isEditorShellRoute() {
+  const path = String(window.location.pathname || "").toLowerCase();
+  return path === "/editor" || path === "/editor.html" || path === "/magx";
+}
+
+function removeEditorShareUi() {
+  if (!isEditorShellRoute()) return;
+  if (shareBtn?.parentElement) shareBtn.parentElement.removeChild(shareBtn);
+  if (shareModal?.parentElement) shareModal.parentElement.removeChild(shareModal);
+}
+
 function getUtf8ByteLength(value) {
   try {
     return new TextEncoder().encode(String(value || "")).length;
@@ -5742,6 +5753,9 @@ function buildPageTurnPreviewHtml() {
         <button id="downloadPdfBtn" class="btn" type="button" aria-label="Download PDF" title="Download PDF">
           <svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="M8.5 10.5L12 14l3.5-3.5"/><path d="M4 18h16"/></svg>
         </button>
+        <button id="sharePreviewBtn" class="btn" type="button" aria-label="Copy Preview Link" title="Copy Preview Link">
+          <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66L11.5 6.84"/><path d="M14 10a4 4 0 0 0-5.66 0L5.5 12.83a4 4 0 0 0 5.66 5.66L12.5 17.16"/></svg>
+        </button>
         <button id="embedCodeBtn" class="btn" type="button" aria-label="Copy Embed Code" title="Copy Embed Code">
           <svg viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/><path d="M14 4l-4 16"/></svg>
         </button>
@@ -5791,6 +5805,7 @@ function buildPageTurnPreviewHtml() {
     const prevFooterBtn = document.getElementById("prevFooterBtn");
     const nextFooterBtn = document.getElementById("nextFooterBtn");
     const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+    const sharePreviewBtn = document.getElementById("sharePreviewBtn");
     const embedCodeBtn = document.getElementById("embedCodeBtn");
     const viewModeBtn = document.getElementById("viewModeBtn");
     const spreadLabel = document.getElementById("spreadLabel");
@@ -6034,6 +6049,20 @@ function buildPageTurnPreviewHtml() {
         alert("Embed code copied.");
       }).catch(() => {
         window.prompt("Copy embed code:", code);
+      });
+    });
+    sharePreviewBtn?.addEventListener("click", () => {
+      const currentHref = String(window.location.href || "").split("#")[0];
+      const hasShareParam = /[?&]share=/.test(currentHref);
+      const url = hasShareParam ? currentHref : String(shareUrlHint || "").trim();
+      if (!url) {
+        alert("Preview link unavailable.");
+        return;
+      }
+      navigator.clipboard.writeText(url).then(() => {
+        alert("Link copied.");
+      }).catch(() => {
+        window.prompt("Copy link:", url);
       });
     });
     viewModeBtn?.addEventListener("click", () => {
@@ -7515,6 +7544,7 @@ function bindEvents() {
 async function init() {
   loadCredits();
   loadAiImagePrefs();
+  removeEditorShareUi();
   populateIconControls();
   updateGridFlyoutOptions();
   updateAiImageRegenerateButton();
