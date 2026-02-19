@@ -4,3 +4,4 @@ node_modules/
 .magx-shares.json
 magx-export/
 *.zip
+Docs/
