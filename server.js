@@ -30,7 +30,7 @@ loadEnvFile(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 4174);
 const SHARE_STORE_FILE = path.join(ROOT, ".magx-shares.json");
-const SHARE_PAYLOAD_MAX_BYTES = 20 * 1024 * 1024;
+const SHARE_PAYLOAD_MAX_BYTES = 40 * 1024 * 1024;
 const SHARE_MAX_ITEMS = 300;
 
 const MIME_BY_EXT = {
@@ -121,7 +121,7 @@ function pruneShareStore() {
 function handleShareCreate(req, res) {
   let raw = "";
   let exceedsHardLimit = false;
-  const hardLimitBytes = SHARE_PAYLOAD_MAX_BYTES + 1024 * 1024;
+  const hardLimitBytes = SHARE_PAYLOAD_MAX_BYTES + 2 * 1024 * 1024;
   req.on("data", (chunk) => {
     if (exceedsHardLimit) return;
     raw += chunk;
@@ -153,7 +153,7 @@ function handleShareCreate(req, res) {
       persistShareStore();
 
       const origin = buildRequestOrigin(req);
-      const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}`;
+      const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
       return sendJson(res, 200, {
         id,
         url: shareUrl,

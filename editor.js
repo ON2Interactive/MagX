@@ -2297,37 +2297,97 @@ function requireEditableStatus() {
   return false;
 }
 
-function buildSharePayload() {
+function getUtf8ByteLength(value) {
+  try {
+    return new TextEncoder().encode(String(value || "")).length;
+  } catch {
+    return String(value || "").length;
+  }
+}
+
+async function optimizeShareImageSource(src) {
+  const value = String(src || "");
+  if (!value.startsWith("data:image/")) return value;
+  const currentBytes = getUtf8ByteLength(value);
+  if (currentBytes <= 1_400_000) return value;
+
+  const image = await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = value;
+  });
+  if (!image) return value;
+
+  const sourceWidth = Number(image.naturalWidth || image.width || 0);
+  const sourceHeight = Number(image.naturalHeight || image.height || 0);
+  if (!sourceWidth || !sourceHeight) return value;
+
+  const maxDimension = 1600;
+  const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const canvasEl = document.createElement("canvas");
+  canvasEl.width = targetWidth;
+  canvasEl.height = targetHeight;
+  const ctx = canvasEl.getContext("2d");
+  if (!ctx) return value;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  let optimized = "";
+  try {
+    optimized = canvasEl.toDataURL("image/webp", 0.82);
+  } catch {
+    optimized = "";
+  }
+  if (!optimized.startsWith("data:image/")) {
+    try {
+      optimized = canvasEl.toDataURL("image/jpeg", 0.82);
+    } catch {
+      optimized = "";
+    }
+  }
+  if (!optimized.startsWith("data:image/")) return value;
+  return getUtf8ByteLength(optimized) < currentBytes ? optimized : value;
+}
+
+async function buildSharePayload() {
   const payload = cloneJson(buildProjectPayload());
-  const stripFields = (item) => {
+  const stripFields = async (item) => {
     if (!item || typeof item !== "object") return item;
     const next = { ...item };
     if (next.type === "image") {
       delete next.aiVersionHistory;
       delete next.aiVersionIndex;
+      if (typeof next.src === "string" && next.src.startsWith("data:image/")) {
+        next.src = await optimizeShareImageSource(next.src);
+      }
     }
     return next;
   };
-  payload.pages = (Array.isArray(payload.pages) ? payload.pages : []).map((page) => {
+  payload.pages = await Promise.all((Array.isArray(payload.pages) ? payload.pages : []).map(async (page) => {
     if (!page || typeof page !== "object") return page;
     const nextPage = { ...page };
     const viewStates = nextPage.viewStates && typeof nextPage.viewStates === "object"
       ? nextPage.viewStates
       : {};
-    ["desktop", "tablet", "mobile"].forEach((viewKey) => {
+    await Promise.all(["desktop", "tablet", "mobile"].map(async (viewKey) => {
       const viewState = viewStates[viewKey];
       if (!viewState || typeof viewState !== "object") return;
       const elements = Array.isArray(viewState.elements) ? viewState.elements : [];
-      viewState.elements = elements.map(stripFields);
-    });
+      viewState.elements = await Promise.all(elements.map(stripFields));
+    }));
     nextPage.viewStates = viewStates;
     return nextPage;
-  });
+  }));
   return payload;
 }
 
 async function createShareLink() {
-  const payload = buildSharePayload();
+  setShareModalStatus("Preparing share link...");
+  const payload = await buildSharePayload();
   let response;
   try {
     response = await fetch("/api/share", {
