@@ -2709,13 +2709,21 @@ async function loadSharedProjectById(shareId) {
 
 async function loadSharedProjectFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
-  const shareId = String(params.get("share") || "").trim();
+  const legacyPathShareMatch = String(window.location.pathname || "")
+    .match(/^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  const shareId = String(params.get("share") || legacyPathShareMatch?.[1] || "").trim();
   const previewParam = String(params.get("preview") || "").trim().toLowerCase();
   const onPreviewRoute = String(window.location.pathname || "").toLowerCase() === "/preview";
-  const openPreviewOnLoad = onPreviewRoute || previewParam === "1" || previewParam === "true" || previewParam === "yes";
+  const openPreviewOnLoad =
+    onPreviewRoute ||
+    Boolean(legacyPathShareMatch?.[1]) ||
+    previewParam === "1" ||
+    previewParam === "true" ||
+    previewParam === "yes";
   if (!shareId) return false;
   await loadSharedProjectById(shareId);
   const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+  window.history.replaceState({}, "", canonicalUrl);
   setShareLinkValue(canonicalUrl);
   if (openPreviewOnLoad) {
     previewDesign({ sameTab: true });
