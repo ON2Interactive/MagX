@@ -2356,9 +2356,10 @@ async function createShareLink() {
   if (!url) {
     throw new Error("Server did not return a share URL.");
   }
-  setShareLinkValue(url);
+  const normalized = normalizeShareLinkInput(url) || url;
+  setShareLinkValue(normalized);
   setShareModalStatus("Share link ready.");
-  return url;
+  return normalized;
 }
 
 function normalizeShareLinkInput(value) {
@@ -2368,12 +2369,12 @@ function normalizeShareLinkInput(value) {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}`;
+      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
     }
     if (raw.startsWith("/")) {
       const parsed = new URL(raw, window.location.origin);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}`;
+      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
     }
   } catch {
     return "";
@@ -2392,9 +2393,28 @@ async function ensureShareLink() {
 
 async function copyShareLink() {
   const url = await ensureShareLink();
-  await navigator.clipboard.writeText(url);
-  setShareModalStatus("Share link copied.");
-  setStatus("Share link copied.");
+  const copied = await copyTextWithFallback(url, "Copy share link:");
+  if (copied) {
+    setShareModalStatus("Share link copied.");
+    setStatus("Share link copied.");
+  } else {
+    setShareModalStatus("Share link ready. Copy manually.");
+    setStatus("Share link ready. Copy manually.");
+  }
+}
+
+async function copyTextWithFallback(text, promptLabel = "Copy text:") {
+  const value = String(text || "");
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // Fall back to manual copy prompt.
+  }
+  window.prompt(promptLabel, value);
+  return false;
 }
 
 function normalizeIncomingProjectPayload(payload) {
@@ -2462,10 +2482,15 @@ async function loadSharedProjectById(shareId) {
 async function loadSharedProjectFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
   const shareId = String(params.get("share") || "").trim();
+  const previewParam = String(params.get("preview") || "").trim().toLowerCase();
+  const openPreviewOnLoad = previewParam === "1" || previewParam === "true" || previewParam === "yes";
   if (!shareId) return false;
   await loadSharedProjectById(shareId);
-  const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}`;
+  const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}&preview=1`;
   setShareLinkValue(canonicalUrl);
+  if (openPreviewOnLoad) {
+    previewDesign({ sameTab: true });
+  }
   return true;
 }
 
@@ -6029,11 +6054,17 @@ function buildPageTurnPreviewHtml() {
 </html>`;
 }
 
-function previewDesign() {
+function previewDesign(options = {}) {
+  const sameTab = Boolean(options?.sameTab);
   bindPreviewMessageListener();
   const html = buildPageTurnPreviewHtml();
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const previewUrl = URL.createObjectURL(blob);
+  if (sameTab) {
+    window.location.replace(previewUrl);
+    setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
+    return;
+  }
   const previewWindow = window.open(previewUrl, "_blank");
   if (!previewWindow) {
     URL.revokeObjectURL(previewUrl);
@@ -6299,9 +6330,14 @@ function bindEvents() {
     try {
       if (createShareLinkBtn) createShareLinkBtn.disabled = true;
       const url = await createShareLink();
-      await navigator.clipboard.writeText(url);
-      setShareModalStatus("Share link created and copied.");
-      setStatus("Share link created and copied.");
+      const copied = await copyTextWithFallback(url, "Copy share link:");
+      if (copied) {
+        setShareModalStatus("Share link created and copied.");
+        setStatus("Share link created and copied.");
+      } else {
+        setShareModalStatus("Share link created. Copy manually.");
+        setStatus("Share link created. Copy manually.");
+      }
     } catch (error) {
       setShareModalStatus(error?.message || "Could not create share link.", true);
       setStatus(error?.message || "Could not create share link.");
