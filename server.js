@@ -44,6 +44,12 @@ const SHARE_MAX_ITEMS = 300;
 const SUPABASE_URL = cleanEnvValue(process.env.SUPABASE_URL || "");
 const SUPABASE_SERVICE_ROLE_KEY = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || "");
 const SUPABASE_STORAGE_BUCKET = cleanEnvValue(process.env.SUPABASE_STORAGE_BUCKET || "magx-assets");
+const APP_ADMIN_EMAILS = new Set(
+  (cleanEnvValue(process.env.APP_ADMIN_EMAILS || "kipme001@gmail.com") || "")
+    .split(",")
+    .map((email) => String(email || "").trim().toLowerCase())
+    .filter(Boolean)
+);
 
 const MIME_BY_EXT = {
   ".html": "text/html; charset=utf-8",
@@ -98,6 +104,80 @@ function buildRequestOrigin(req) {
 
 function createShareId() {
   return crypto.randomBytes(9).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isAdminEmail(email) {
+  return APP_ADMIN_EMAILS.has(normalizeEmail(email));
+}
+
+function decodeJwtPayload(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return null;
+  const parts = raw.split(".");
+  if (parts.length < 2) return null;
+  const payloadPart = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  const padded = payloadPart + "=".repeat((4 - (payloadPart.length % 4)) % 4);
+  try {
+    const json = Buffer.from(padded, "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = "";
+    req.on("data", (chunk) => {
+      raw += chunk;
+      if (raw.length > 4 * 1024 * 1024) {
+        reject(new Error("Request body too large."));
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(raw || "{}"));
+      } catch {
+        reject(new Error("Invalid JSON body."));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+async function handleAuthBootstrap(req, res) {
+  try {
+    const body = await parseJsonBody(req);
+    const accessToken = String(body?.accessToken || "").trim();
+    if (!accessToken) {
+      return sendJson(res, 400, { error: "Missing access token." });
+    }
+    const claims = decodeJwtPayload(accessToken) || {};
+    const email = normalizeEmail(claims?.email || body?.email);
+    const userId = String(claims?.sub || body?.userId || "").trim() || `usr_${createShareId()}`;
+    if (!email) {
+      return sendJson(res, 400, { error: "Could not determine user email from access token." });
+    }
+    const profile = {
+      id: userId,
+      email,
+      name: String(claims?.name || claims?.user_metadata?.full_name || email.split("@")[0]),
+      isAdmin: isAdminEmail(email),
+      creditsBalance: 1000,
+    };
+    return sendJson(res, 200, {
+      ok: true,
+      profile,
+      redirectTo: "/editor",
+      activeProject: null,
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error?.message || "Could not bootstrap auth session." });
+  }
 }
 
 function normalizeOwnerId(value) {
@@ -1044,6 +1124,11 @@ function requestHandler(req, res) {
 
   if (req.method === "POST" && pathname === "/api/image-generate") {
     handleImageGenerate(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/auth/bootstrap") {
+    handleAuthBootstrap(req, res);
     return;
   }
 
