@@ -153,7 +153,7 @@ function handleShareCreate(req, res) {
       persistShareStore();
 
       const origin = buildRequestOrigin(req);
-      const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      const shareUrl = `${origin}/preview?share=${encodeURIComponent(id)}`;
       return sendJson(res, 200, {
         id,
         url: shareUrl,

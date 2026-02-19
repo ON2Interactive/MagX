@@ -2429,12 +2429,12 @@ function normalizeShareLinkInput(value) {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      if (id) return `${parsed.origin}/preview?share=${encodeURIComponent(id)}`;
     }
     if (raw.startsWith("/")) {
       const parsed = new URL(raw, window.location.origin);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      if (id) return `${parsed.origin}/preview?share=${encodeURIComponent(id)}`;
     }
   } catch {
     return "";
@@ -2543,10 +2543,11 @@ async function loadSharedProjectFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
   const shareId = String(params.get("share") || "").trim();
   const previewParam = String(params.get("preview") || "").trim().toLowerCase();
-  const openPreviewOnLoad = previewParam === "1" || previewParam === "true" || previewParam === "yes";
+  const onPreviewRoute = String(window.location.pathname || "").toLowerCase() === "/preview";
+  const openPreviewOnLoad = onPreviewRoute || previewParam === "1" || previewParam === "true" || previewParam === "yes";
   if (!shareId) return false;
   await loadSharedProjectById(shareId);
-  const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+  const canonicalUrl = `${window.location.origin}/preview?share=${encodeURIComponent(shareId)}`;
   setShareLinkValue(canonicalUrl);
   if (openPreviewOnLoad) {
     previewDesign({ sameTab: true });
@@ -5656,7 +5657,7 @@ function buildPageTurnPreviewHtml() {
   const currentShareId = String(currentUrlParams.get("share") || "").trim();
   const shareUrlHint =
     (currentShareId
-      ? `${window.location.origin}/editor?share=${encodeURIComponent(currentShareId)}&preview=1`
+      ? `${window.location.origin}/preview?share=${encodeURIComponent(currentShareId)}`
       : normalizeShareLinkInput(shareLinkField?.value || "")) || "";
   const pages = state.pages.map((page, index) => {
     const viewKey = page.currentView || "desktop";

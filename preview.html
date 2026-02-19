@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MagX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=DM+Sans:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Lato:wght@300;400;700;900&family=Nunito:wght@300;400;500;600;700;800&family=Work+Sans:wght@300;400;500;600;700;800&family=Raleway:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700;800&family=Oswald:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700;900&family=Playfair+Display:wght@400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700;800&family=Source+Serif+4:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap"
+    />
+    <link rel="stylesheet" href="/editor.css" />
+  </head>
+  <body class="bf-page">
+    <div class="bf-app-shell">
+      <header class="bf-topbar">
+        <div class="bf-topbar-left">
+          <a class="bf-home-link" href="/">MagX</a>
+        </div>
+        <div class="bf-topbar-center">
+          <div class="zoom-controls">
+            <button id="zoomOutBtn" class="icon-btn" type="button" aria-label="Zoom Out" title="Zoom Out">
+              <i data-lucide="zoom-out"></i>
+            </button>
+            <span id="zoomLevel" class="zoom-level">100%</span>
+            <button id="zoomInBtn" class="icon-btn" type="button" aria-label="Zoom In" title="Zoom In">
+              <i data-lucide="zoom-in"></i>
+            </button>
+            <div class="grid-menu">
+              <button id="gridBtn" class="icon-btn" type="button" aria-label="Layout Grids" title="Layout Grids">
+                <i data-lucide="grid-3x3"></i>
+              </button>
+              <div id="gridFlyout" class="topbar-flyout hidden-panel" aria-label="Grid Presets">
+                <button type="button" class="topbar-flyout-option" data-grid-preset="none">Grid Off</button>
+                <button type="button" class="topbar-flyout-option" data-grid-preset="columns-12">12 Column</button>
+                <button type="button" class="topbar-flyout-option" data-grid-preset="grid-3">3 x 3</button>
+                <button type="button" class="topbar-flyout-option" data-grid-preset="grid-4">4 x 4</button>
+                <button type="button" class="topbar-flyout-option is-active" data-grid-preset="grid-6">6 x 6</button>
+                <button id="gridAdvancedToggleBtn" type="button" class="topbar-flyout-option topbar-flyout-divider">Advanced...</button>
+                <div id="gridAdvancedPanel" class="grid-advanced-panel hidden-panel" aria-label="Custom Grid Settings">
+                  <label>
+                    <span>Columns</span>
+                    <input id="gridColumnsInput" type="number" min="1" max="48" step="1" value="12" />
+                  </label>
+                  <label>
+                    <span>Gutter</span>
+                    <input id="gridGutterInput" type="number" min="0" max="240" step="1" value="16" />
+                  </label>
+                  <label>
+                    <span>Margin</span>
+                    <input id="gridMarginInput" type="number" min="0" max="600" step="1" value="24" />
+                  </label>
+                  <button id="gridAdvancedApplyBtn" type="button" class="icon-btn" title="Apply Custom Grid" aria-label="Apply Custom Grid">
+                    <i data-lucide="plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bf-topbar-right">
+          <button id="undoBtn" class="icon-btn" type="button" aria-label="Undo" title="Undo">
+            <i data-lucide="undo-2"></i>
+          </button>
+          <button id="redoBtn" class="icon-btn" type="button" aria-label="Redo" title="Redo">
+            <i data-lucide="redo-2"></i>
+          </button>
+          <button id="groupBtn" class="icon-btn" type="button" aria-label="Group Selected" title="Group (Cmd/Ctrl+G)">
+            <i data-lucide="link-2"></i>
+          </button>
+          <button id="ungroupBtn" class="icon-btn" type="button" aria-label="Ungroup Selected" title="Ungroup (Cmd/Ctrl+Shift+G)">
+            <i data-lucide="unlink-2"></i>
+          </button>
+          <button id="sendBackBtn" class="icon-btn" type="button" aria-label="Send Backward" title="Send Backward">
+            <i data-lucide="move-down"></i>
+          </button>
+          <button id="bringFrontBtn" class="icon-btn" type="button" aria-label="Bring Forward" title="Bring Forward">
+            <i data-lucide="move-up"></i>
+          </button>
+          <button id="previewBtn" class="icon-btn" type="button" aria-label="Preview Design" title="Preview Design">
+            <i data-lucide="eye"></i>
+          </button>
+          <button id="shareBtn" class="icon-btn" type="button" aria-label="Share Project" title="Share Project">
+            <i data-lucide="share-2"></i>
+          </button>
+          <button id="exportBtn" class="icon-btn icon-btn-text icon-btn-export" type="button" aria-label="Export" title="Export">
+            <i data-lucide="download"></i>
+            <span>Export</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="bf-workspace">
+        <aside class="bf-left-toolbar" aria-label="Tools">
+          <button id="toolSelectBtn" type="button" class="tool-btn is-active" aria-label="Selection Arrow" title="Selection Arrow">
+            <i data-lucide="mouse-pointer-2"></i>
+          </button>
+          <button id="toolUploadBtn" type="button" class="tool-btn" aria-label="Image" title="Image">
+            <i data-lucide="image"></i>
+          </button>
+          <button id="addTextBtn" type="button" class="tool-btn" aria-label="Text" title="Text">
+            <i data-lucide="type"></i>
+          </button>
+          <button id="toolShapesBtn" type="button" class="tool-btn" aria-label="Shapes" title="Shapes">
+            <i data-lucide="shapes"></i>
+          </button>
+          <button id="toolIconsBtn" type="button" class="tool-btn" aria-label="Icons" title="Icons">
+            <i data-lucide="sparkles"></i>
+          </button>
+          <button id="toolAiImageBtn" type="button" class="tool-btn" aria-label="AI Image" title="AI Image">
+            <i data-lucide="wand-sparkles"></i>
+          </button>
+          <button id="deleteBtn" type="button" class="tool-btn" title="Reset Canvas" aria-label="Reset Canvas">
+            <i data-lucide="rotate-ccw"></i>
+          </button>
+
+          <div id="shapeFlyout" class="shape-flyout hidden-panel" aria-label="Shape Types">
+            <button type="button" class="shape-option-btn" data-shape-type="rectangle" title="Rectangle">
+              <i data-lucide="square"></i>
+            </button>
+            <button type="button" class="shape-option-btn" data-shape-type="circle" title="Circle">
+              <i data-lucide="circle"></i>
+            </button>
+            <button type="button" class="shape-option-btn" data-shape-type="triangle" title="Triangle">
+              <i data-lucide="triangle"></i>
+            </button>
+            <button type="button" class="shape-option-btn" data-shape-type="line" title="Line">
+              <i data-lucide="minus"></i>
+            </button>
+            <button type="button" class="shape-option-btn" data-shape-type="star" title="Star">
+              <i data-lucide="star"></i>
+            </button>
+            <button type="button" class="shape-option-btn" data-shape-type="polygon" title="Polygon">
+              <i data-lucide="hexagon"></i>
+            </button>
+          </div>
+          <div id="iconFlyout" class="shape-flyout icon-flyout hidden-panel" aria-label="Lucide Icons">
+            <div id="iconFlyoutGrid" class="icon-flyout-grid"></div>
+          </div>
+
+          <div class="bf-tool-spacer"></div>
+          <button id="settingsBtn" type="button" class="tool-btn" title="Settings" aria-label="Settings">
+            <i data-lucide="settings"></i>
+          </button>
+          <input id="imageInput" type="file" accept="image/*" hidden />
+        </aside>
+
+        <section class="bf-canvas-panel" aria-label="Design Canvas">
+          <div class="bf-canvas-wrap">
+            <div id="designCanvas" class="bf-canvas" role="application" aria-label="MagX canvas"></div>
+          </div>
+        </section>
+
+        <aside class="bf-inspector-panel" aria-label="Inspector">
+          <h2>Inspector</h2>
+
+          <details id="inspectorCanvasSection" class="bf-inspector-section" open>
+            <summary>Canvas</summary>
+            <div class="bf-type-fields">
+              <label>
+                Size
+                <select id="publicationSizeSelect" aria-label="Publication Size">
+                  <option value="custom">Size</option>
+                  <option value="us_letter_portrait" selected>8.5x11</option>
+                  <option value="us_letter_landscape">11x8.5</option>
+                  <option value="a4_portrait">A4</option>
+                  <option value="a4_landscape">A4 Landscape</option>
+                  <option value="tabloid_portrait">11x17</option>
+                  <option value="tabloid_landscape">17x11</option>
+                </select>
+              </label>
+              <label>
+                Canvas Color
+                <div class="bf-color-input-row">
+                  <input id="canvasBgColor" type="color" value="#f6f7fb" />
+                  <input id="canvasBgColorHex" type="text" value="#F6F7FB" maxlength="7" spellcheck="false" />
+                </div>
+              </label>
+              <label>
+                Width
+                <input id="canvasWidth" type="number" min="1.07" max="40" step="0.01" value="8.5" />
+              </label>
+              <label>
+                Height
+                <input id="canvasHeight" type="number" min="0.80" max="40" step="0.01" value="11" />
+              </label>
+              <button id="applyCanvasSizeBtn" type="button" title="Apply Canvas Size" aria-label="Apply Canvas Size">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+          </details>
+
+          <details id="inspectorTransformSection" class="bf-inspector-section" open>
+            <summary>Transform</summary>
+            <div id="inspectorEmpty" class="bf-empty-inspector">Select an element to edit properties.</div>
+            <div id="inspectorBody" class="bf-inspector bf-inspector-grid hidden">
+              <div class="bf-transform-toggle-row hidden">
+                <span>100%</span>
+                <label class="bf-switch" for="propShapePreviewFullWidth">
+                  <input id="propShapePreviewFullWidth" type="checkbox" />
+                  <span class="bf-switch-track"></span>
+                </label>
+              </div>
+              <label>
+                X
+                <input id="propX" type="number" />
+              </label>
+              <label>
+                Y
+                <input id="propY" type="number" />
+              </label>
+              <label>
+                Width
+                <input id="propWidth" type="number" min="10" />
+              </label>
+              <label>
+                Height
+                <input id="propHeight" type="number" min="10" />
+              </label>
+              <label>
+                Rotation
+                <div class="bf-range-with-number">
+                  <input id="propRotation" type="range" min="-360" max="360" step="1" />
+                  <input id="propRotationNumber" type="number" min="-360" max="360" step="1" />
+                </div>
+              </label>
+              <label>
+                Opacity
+                <input id="propOpacity" type="range" min="0" max="100" />
+              </label>
+            </div>
+          </details>
+
+          <details id="inspectorTextSection" class="bf-inspector-section" open>
+            <summary>Text</summary>
+            <div id="textFields" class="bf-type-fields hidden">
+              <label>
+                Font
+                <select id="propFontFamily">
+                  <option value="Helvetica, Arial, sans-serif" selected>Helvetica</option>
+                  <option value="'Space Grotesk', 'Avenir Next', sans-serif">Space Grotesk</option>
+                  <option value="Inter, 'Segoe UI', sans-serif">Inter</option>
+                  <option value="'DM Sans', 'Segoe UI', sans-serif">DM Sans</option>
+                  <option value="Outfit, 'Segoe UI', sans-serif">Outfit</option>
+                  <option value="Manrope, 'Segoe UI', sans-serif">Manrope</option>
+                  <option value="Poppins, 'Segoe UI', sans-serif">Poppins</option>
+                  <option value="Montserrat, 'Segoe UI', sans-serif">Montserrat</option>
+                  <option value="Lato, 'Segoe UI', sans-serif">Lato</option>
+                  <option value="Nunito, 'Segoe UI', sans-serif">Nunito</option>
+                  <option value="'Work Sans', 'Segoe UI', sans-serif">Work Sans</option>
+                  <option value="Raleway, 'Segoe UI', sans-serif">Raleway</option>
+                  <option value="Rubik, 'Segoe UI', sans-serif">Rubik</option>
+                  <option value="Oswald, 'Segoe UI', sans-serif">Oswald</option>
+                  <option value="'Bebas Neue', 'Arial Narrow', sans-serif">Bebas Neue</option>
+                  <option value="'Merriweather', Georgia, serif">Merriweather</option>
+                  <option value="'Playfair Display', Georgia, serif">Playfair Display</option>
+                  <option value="'Source Sans 3', 'Segoe UI', sans-serif">Source Sans 3</option>
+                  <option value="'Source Serif 4', Georgia, serif">Source Serif 4</option>
+                  <option value="'Avenir Next', 'Segoe UI', sans-serif">Avenir Next</option>
+                  <option value="'Proxima Nova', Montserrat, 'Segoe UI', sans-serif">Proxima Nova (Adobe)</option>
+                  <option value="'Acumin Pro', 'Helvetica Neue', 'Segoe UI', sans-serif">Acumin Pro (Adobe)</option>
+                  <option value="'Myriad Pro', 'Trebuchet MS', 'Segoe UI', sans-serif">Myriad Pro (Adobe)</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                </select>
+              </label>
+              <label>
+                Font Size
+                <div class="bf-range-with-number">
+                  <input id="propFontSize" type="range" min="8" max="2000" step="1" />
+                  <input id="propFontSizeNumber" type="number" min="8" max="2000" step="1" />
+                </div>
+              </label>
+              <label>
+                Font Weight
+                <select id="propFontWeight">
+                  <option value="100">100 Thin</option>
+                  <option value="200">200 Extra Light</option>
+                  <option value="300">300 Light</option>
+                  <option value="400">400 Regular</option>
+                  <option value="500">500 Medium</option>
+                  <option value="600" selected>600 Semi Bold</option>
+                  <option value="700">700 Bold</option>
+                  <option value="800">800 Extra Bold</option>
+                  <option value="900">900 Black</option>
+                </select>
+              </label>
+              <label>
+                Text Color
+                <div class="bf-color-input-row">
+                  <input id="propTextColor" type="color" />
+                  <input id="propTextColorHex" type="text" maxlength="7" spellcheck="false" />
+                </div>
+              </label>
+              <label>
+                Fill Mode
+                <select id="propTextFillMode">
+                  <option value="none">None</option>
+                  <option value="solid">Solid</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="image">Image Mask</option>
+                </select>
+              </label>
+              <div id="propTextGradientFields" class="bf-advanced-fill hidden">
+                <label>
+                  Gradient From
+                  <input id="propTextGradientFrom" type="color" value="#11131f" />
+                </label>
+                <label>
+                  Gradient To
+                  <input id="propTextGradientTo" type="color" value="#6f7380" />
+                </label>
+                <label>
+                  Gradient Angle
+                  <input id="propTextGradientAngle" type="range" min="0" max="360" step="1" value="90" />
+                </label>
+                <div id="propTextGradientPresets" class="bf-fill-presets">
+                  <button type="button" class="bf-fill-preset" data-from="#11131F" data-to="#6F7380" data-angle="90">Mono</button>
+                  <button type="button" class="bf-fill-preset" data-from="#FF7A18" data-to="#AF002D" data-angle="35">Sunset</button>
+                  <button type="button" class="bf-fill-preset" data-from="#00C6FF" data-to="#0072FF" data-angle="90">Ocean</button>
+                </div>
+              </div>
+              <div id="propTextImageFields" class="bf-advanced-fill hidden">
+                <p class="bf-fill-hint">Upload an image and use it as text mask fill.</p>
+                <div class="bf-icon-actions-row">
+                  <button id="propTextImageUploadBtn" type="button" title="Upload Text Mask Image" aria-label="Upload Text Mask Image">
+                    <i data-lucide="upload"></i>
+                  </button>
+                  <button id="propTextImageClearBtn" type="button" title="Clear Text Image Fill" aria-label="Clear Text Image Fill">
+                    <i data-lucide="eraser"></i>
+                  </button>
+                </div>
+                <input id="propTextImageInput" type="file" accept="image/*" hidden />
+                <label>
+                  Image Scale %
+                  <input id="propTextImageScale" type="range" min="20" max="300" value="100" />
+                </label>
+                <label>
+                  Image X
+                  <input id="propTextImageX" type="range" min="0" max="100" value="50" />
+                </label>
+                <label>
+                  Image Y
+                  <input id="propTextImageY" type="range" min="0" max="100" value="50" />
+                </label>
+              </div>
+              <label>
+                Alignment
+                <div class="bf-segmented" role="group" aria-label="Text Alignment">
+                  <button id="propTextAlignLeft" type="button" title="Align Left" aria-label="Align Left"><i data-lucide="align-left"></i></button>
+                  <button id="propTextAlignCenter" type="button" title="Align Center" aria-label="Align Center"><i data-lucide="align-center"></i></button>
+                  <button id="propTextAlignRight" type="button" title="Align Right" aria-label="Align Right"><i data-lucide="align-right"></i></button>
+                </div>
+              </label>
+              <label>
+                Decorations
+                <div class="bf-segmented bf-segmented-two" role="group" aria-label="Text Decorations">
+                  <button id="propTextUnderline" type="button" title="Underline" aria-label="Underline"><i data-lucide="underline"></i></button>
+                  <button id="propTextStrikethrough" type="button" title="Strikethrough" aria-label="Strikethrough"><i data-lucide="strikethrough"></i></button>
+                </div>
+              </label>
+              <label>
+                OpenType
+                <div class="bf-segmented bf-segmented-two" role="group" aria-label="OpenType Controls">
+                  <button id="propTextAllCaps" type="button" title="All Caps" aria-label="All Caps"><span class="bf-glyph-btn">AA</span></button>
+                  <button id="propTextSmallCaps" type="button" title="Small Caps" aria-label="Small Caps"><span class="bf-glyph-btn">Aa</span></button>
+                  <button id="propTextSuperscript" type="button" title="Superscript" aria-label="Superscript"><i data-lucide="superscript"></i></button>
+                  <button id="propTextSubscript" type="button" title="Subscript" aria-label="Subscript"><i data-lucide="subscript"></i></button>
+                </div>
+              </label>
+              <label>
+                Tracking
+                <div class="bf-range-with-number">
+                  <input id="propTracking" type="range" min="-5" max="40" step="0.1" />
+                  <input id="propTrackingNumber" type="number" min="-5" max="40" step="0.1" />
+                </div>
+              </label>
+              <label>
+                Line Spacing
+                <div class="bf-range-with-number">
+                  <input id="propLineHeight" type="range" min="0.8" max="3" step="0.05" />
+                  <input id="propLineHeightNumber" type="number" min="0.8" max="3" step="0.05" />
+                </div>
+              </label>
+              <label>
+                Word Spacing
+                <div class="bf-range-with-number">
+                  <input id="propLetterSpacing" type="range" min="-5" max="40" step="0.1" />
+                  <input id="propLetterSpacingNumber" type="number" min="-5" max="40" step="0.1" />
+                </div>
+              </label>
+            </div>
+          </details>
+
+          <details id="inspectorShapeSection" class="bf-inspector-section" open>
+            <summary>Shape</summary>
+            <div id="shapeFields" class="bf-type-fields hidden">
+              <label>
+                Fill
+                <div class="bf-color-input-row">
+                  <input id="propFill" type="color" />
+                  <input id="propFillHex" type="text" maxlength="7" spellcheck="false" />
+                </div>
+              </label>
+              <label>
+                Fill Mode
+                <select id="propShapeFillMode">
+                  <option value="none">None</option>
+                  <option value="solid">Solid</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="image">Image Mask</option>
+                </select>
+              </label>
+              <div id="propShapeGradientFields" class="bf-advanced-fill hidden">
+                <label>
+                  Gradient From
+                  <input id="propShapeGradientFrom" type="color" value="#595959" />
+                </label>
+                <label>
+                  Gradient To
+                  <input id="propShapeGradientTo" type="color" value="#9d9d9d" />
+                </label>
+                <label>
+                  Gradient Angle
+                  <input id="propShapeGradientAngle" type="range" min="0" max="360" step="1" value="90" />
+                </label>
+                <div id="propShapeGradientPresets" class="bf-fill-presets">
+                  <button type="button" class="bf-fill-preset" data-from="#595959" data-to="#9D9D9D" data-angle="90">Steel</button>
+                  <button type="button" class="bf-fill-preset" data-from="#7928CA" data-to="#FF0080" data-angle="35">Neon</button>
+                  <button type="button" class="bf-fill-preset" data-from="#1FA2FF" data-to="#12D8FA" data-angle="90">Sky</button>
+                </div>
+              </div>
+              <div id="propShapeImageFields" class="bf-advanced-fill hidden">
+                <p class="bf-fill-hint">Drop an image onto a selected shape, or upload one.</p>
+                <div class="bf-icon-actions-row">
+                  <button id="propShapeImageUploadBtn" type="button" title="Upload Fill Image" aria-label="Upload Fill Image">
+                    <i data-lucide="upload"></i>
+                  </button>
+                  <button id="propShapeImageClearBtn" type="button" title="Clear Image Fill" aria-label="Clear Image Fill">
+                    <i data-lucide="eraser"></i>
+                  </button>
+                </div>
+                <input id="propShapeImageInput" type="file" accept="image/*" hidden />
+                <label>
+                  Image Scale %
+                  <input id="propShapeImageScale" type="range" min="20" max="300" value="100" />
+                </label>
+                <label>
+                  Image X
+                  <input id="propShapeImageX" type="range" min="0" max="100" value="50" />
+                </label>
+                <label>
+                  Image Y
+                  <input id="propShapeImageY" type="range" min="0" max="100" value="50" />
+                </label>
+              </div>
+              <label>
+                Border
+                <div class="bf-color-input-row">
+                  <input id="propStroke" type="color" />
+                  <input id="propStrokeHex" type="text" maxlength="7" spellcheck="false" />
+                </div>
+              </label>
+              <label>
+                Border Width
+                <div class="bf-range-with-number">
+                  <input id="propStrokeWidth" type="range" min="0" max="80" step="1" />
+                  <input id="propStrokeWidthNumber" type="number" min="0" max="80" step="1" />
+                </div>
+              </label>
+              <div class="bf-border-sides-grid">
+                <label>
+                  Border Top
+                  <input id="propStrokeTop" type="number" min="0" max="80" step="1" />
+                </label>
+                <label>
+                  Border Right
+                  <input id="propStrokeRight" type="number" min="0" max="80" step="1" />
+                </label>
+                <label>
+                  Border Bottom
+                  <input id="propStrokeBottom" type="number" min="0" max="80" step="1" />
+                </label>
+                <label>
+                  Border Left
+                  <input id="propStrokeLeft" type="number" min="0" max="80" step="1" />
+                </label>
+              </div>
+              <label>
+                Radius
+                <div class="bf-range-with-number">
+                  <input id="propRadius" type="range" min="0" max="200" step="1" />
+                  <input id="propRadiusNumber" type="number" min="0" max="200" step="1" />
+                </div>
+              </label>
+            </div>
+          </details>
+
+          <details id="inspectorImageSection" class="bf-inspector-section" open>
+            <summary>Image</summary>
+            <div id="imageFields" class="bf-type-fields hidden">
+              <label>
+                Fit
+                <select id="propImageFit">
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Fill</option>
+                </select>
+              </label>
+              <label>
+                Focal X
+                <input id="propImageFocalX" type="range" min="0" max="100" value="50" />
+              </label>
+              <label>
+                Focal Y
+                <input id="propImageFocalY" type="range" min="0" max="100" value="50" />
+              </label>
+              <label>
+                Brightness
+                <input id="propImageBrightness" type="range" min="0" max="200" value="100" />
+              </label>
+              <label>
+                Contrast
+                <input id="propImageContrast" type="range" min="0" max="200" value="100" />
+              </label>
+              <label>
+                Saturation
+                <input id="propImageSaturation" type="range" min="0" max="200" value="100" />
+              </label>
+              <label>
+                Blur
+                <input id="propImageBlur" type="range" min="0" max="20" step="0.1" value="0" />
+              </label>
+              <label>
+                Grayscale
+                <input id="propImageGrayscale" type="range" min="0" max="100" value="0" />
+              </label>
+              <label>
+                Sepia
+                <input id="propImageSepia" type="range" min="0" max="100" value="0" />
+              </label>
+              <label>
+                Hue
+                <input id="propImageHue" type="range" min="0" max="360" value="0" />
+              </label>
+              <div class="bf-image-actions-row">
+                <button id="propImageAiEditBtn" type="button" class="bf-ai-edit-btn" title="AI Edit" aria-label="AI Edit">
+                  <i data-lucide="sparkles"></i>
+                </button>
+                <button id="propImageDownloadBtn" type="button" title="Download Image Asset" aria-label="Download Image Asset">
+                  <i data-lucide="download"></i>
+                </button>
+              </div>
+              <div class="bf-image-actions-row">
+                <button id="propImageVersionPrevBtn" type="button" title="Previous AI Version" aria-label="Previous AI Version">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <button id="propImageVersionNextBtn" type="button" title="Next AI Version" aria-label="Next AI Version">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+                <button id="propImageRevertOriginalBtn" type="button" title="Revert to Original" aria-label="Revert to Original">
+                  <i data-lucide="rotate-ccw"></i>
+                </button>
+              </div>
+              <p id="propImageVersionStatus" class="bf-fill-hint">Version history unavailable.</p>
+            </div>
+          </details>
+
+          <details id="inspectorIconSection" class="bf-inspector-section" open>
+            <summary>Icon</summary>
+            <div id="iconFields" class="bf-type-fields hidden">
+              <label>
+                Icon
+                <select id="propIconName"></select>
+              </label>
+              <label>
+                Color
+                <div class="bf-color-input-row">
+                  <input id="propIconColor" type="color" value="#1f1f1f" />
+                  <input id="propIconColorHex" type="text" value="#1F1F1F" maxlength="7" spellcheck="false" />
+                </div>
+              </label>
+              <label>
+                Stroke Width
+                <div class="bf-range-with-number">
+                  <input id="propIconStrokeWidth" type="range" min="1" max="4" step="0.25" value="1.75" />
+                  <input id="propIconStrokeWidthNumber" type="number" min="1" max="4" step="0.25" value="1.75" />
+                </div>
+              </label>
+            </div>
+          </details>
+
+          <details id="inspectorLayersSection" class="bf-inspector-section" open>
+            <summary>Layers</summary>
+            <ul id="layerList" class="bf-layer-list"></ul>
+          </details>
+
+          <p id="statusText" class="bf-status" aria-live="polite"></p>
+          <div class="bf-credits-footer">
+            <button id="creditsBtn" type="button" class="bf-credits-btn">Credits: 0</button>
+          </div>
+        </aside>
+
+        <aside class="bf-pages-drawer" aria-label="Pages">
+          <div class="bf-pages-header">
+            <h3>Pages</h3>
+            <button id="addPageBtn" type="button" class="icon-btn" aria-label="Add Page" title="Add Page">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+          <ul id="pageThumbList" class="bf-page-list"></ul>
+        </aside>
+      </main>
+    </div>
+
+    <div id="clearCanvasModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="clearCanvasModalTitle">
+      <div class="bf-modal-card">
+        <h3 id="clearCanvasModalTitle">Clear Canvas?</h3>
+        <p class="bf-modal-subtitle">This will remove all elements from the current canvas view. This action can be undone.</p>
+        <div class="bf-modal-actions">
+          <button id="clearCanvasCancelBtn" type="button">Cancel</button>
+          <button id="clearCanvasConfirmBtn" type="button" class="bf-danger-btn">
+            <i data-lucide="trash-2"></i>
+            <span>Clear Canvas</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="exportModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
+      <div class="bf-modal-card">
+        <h3 id="exportModalTitle">Export Package</h3>
+        <p class="bf-modal-subtitle">Choose formats to include. Export will always download a ZIP package.</p>
+        <label class="bf-modal-check">
+          <input id="exportFormatPng" type="checkbox" checked />
+          <span>PNG</span>
+        </label>
+        <label class="bf-modal-check">
+          <input id="exportFormatHtml" type="checkbox" checked />
+          <span>HTML</span>
+        </label>
+        <label class="bf-modal-check">
+          <input id="exportFormatPdf" type="checkbox" checked />
+          <span>PDF</span>
+        </label>
+        <label class="bf-modal-check">
+          <input id="exportFormatMeta" type="checkbox" checked />
+          <span>Metadata JSON</span>
+        </label>
+        <div class="bf-modal-actions">
+          <button id="exportModalCancelBtn" type="button">Cancel</button>
+          <button id="exportModalConfirmBtn" type="button">
+            <i data-lucide="download"></i>
+            <span>Export ZIP</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="shareModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <div class="bf-modal-card">
+        <h3 id="shareModalTitle">Share Project</h3>
+        <p class="bf-modal-subtitle">Create a link collaborators can open to load this project.</p>
+        <div class="bf-share-link-row">
+          <input id="shareLinkField" type="text" placeholder="No link generated yet." />
+          <button id="createShareLinkBtn" type="button">Create Link</button>
+          <button id="copyShareLinkBtn" type="button" disabled>Copy Link</button>
+        </div>
+        <p id="shareModalStatus" class="bf-modal-subtitle"></p>
+        <button id="nativeShareBtn" type="button">Share Link</button>
+        <div class="bf-modal-actions">
+          <button id="shareModalCloseBtn" type="button" class="bf-icon-only-btn" title="Close" aria-label="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="creditsModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="creditsModalTitle">
+      <div class="bf-modal-card">
+        <h3 id="creditsModalTitle">Buy Credits</h3>
+        <p class="bf-modal-subtitle">Credit checkout will be wired next. Your balance controls AI actions and export usage.</p>
+        <div class="bf-credits-modal-balance" id="creditsModalBalance">Current balance: 0 credits</div>
+        <div class="bf-modal-actions">
+          <button id="creditsModalCloseBtn" type="button" class="bf-icon-only-btn" title="Close" aria-label="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="bf-modal-card">
+        <button id="settingsModalCloseBtn" type="button" class="bf-icon-only-btn bf-modal-close-btn" title="Close" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+        <h3 id="settingsModalTitle">Settings</h3>
+        <p class="bf-modal-subtitle">Project storage is local for now. Supabase wiring can be connected next.</p>
+
+        <label>
+          Project Name
+          <input id="settingsProjectName" type="text" placeholder="Untitled MagX Project" />
+        </label>
+
+        <div class="bf-settings-actions">
+          <button id="settingsSaveProjectBtn" type="button">
+            <i data-lucide="save"></i>
+            <span>Save Local</span>
+          </button>
+          <button id="settingsExportProjectBtn" type="button">
+            <i data-lucide="download"></i>
+            <span>Download JSON</span>
+          </button>
+          <button id="settingsImportProjectBtn" type="button">
+            <i data-lucide="upload"></i>
+            <span>Import JSON</span>
+          </button>
+        </div>
+
+        <label>
+          Saved Projects
+          <select id="settingsSavedProjects" size="6"></select>
+        </label>
+
+        <div class="bf-settings-actions">
+          <button id="settingsLoadProjectBtn" type="button">
+            <i data-lucide="folder-open"></i>
+            <span>Load Selected</span>
+          </button>
+          <button id="settingsDeleteProjectBtn" type="button" class="bf-danger-btn">
+            <i data-lucide="trash-2"></i>
+            <span>Delete Selected</span>
+          </button>
+        </div>
+
+        <p id="settingsModalStatus" class="bf-modal-subtitle"></p>
+        <input id="settingsImportInput" type="file" accept="application/json,.json" hidden />
+      </div>
+    </div>
+
+    <div id="aiImageModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="aiImageModalTitle">
+      <div id="aiImageLoadingIndicator" class="bf-ai-loading hidden" aria-live="polite" aria-label="Generating image">
+        <i data-lucide="loader-circle"></i>
+      </div>
+      <div class="bf-ai-compose-shell" role="group" aria-labelledby="aiImageModalTitle">
+        <h3 id="aiImageModalTitle" class="hidden">Generate Image</h3>
+        <div class="bf-ai-compose-size-row">
+          <select id="aiImageSize" aria-label="Image Size">
+            <option value="1:1">1:1</option>
+            <option value="2:1">2:1</option>
+            <option value="1:2">1:2</option>
+            <option value="3:2">3:2</option>
+            <option value="2:3">2:3</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4" selected>3:4</option>
+            <option value="5:4">5:4</option>
+            <option value="4:5">4:5</option>
+            <option value="6:10">6:10</option>
+            <option value="14:10">14:10</option>
+            <option value="10:14">10:14</option>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+          </select>
+        </div>
+        <div class="bf-ai-compose-input-wrap">
+          <input id="aiImagePrompt" type="text" placeholder="Describe the image..." autocomplete="off" />
+          <div class="bf-ai-compose-inline-actions">
+            <button id="aiImageRegenerateBtn" type="button" class="bf-icon-only-btn bf-ai-compose-btn" title="Regenerate" aria-label="Regenerate" disabled>
+              <i data-lucide="refresh-cw"></i>
+            </button>
+            <button id="aiImageGenerateBtn" type="button" class="bf-icon-only-btn bf-ai-compose-btn" title="Generate Image" aria-label="Generate Image">
+              <i data-lucide="send"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="aiImageEditModal" class="bf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="aiImageEditModalTitle">
+      <div class="bf-modal-card">
+        <h3 id="aiImageEditModalTitle">AI Edit Image</h3>
+        <div class="bf-ai-edit-preview-wrap">
+          <img id="aiImageEditPreview" alt="Selected image preview" class="bf-ai-edit-preview" />
+        </div>
+        <label>
+          Prompt
+          <textarea id="aiImageEditPrompt" rows="5" placeholder="Describe how to edit this image..."></textarea>
+        </label>
+        <p id="aiImageEditModalStatus" class="bf-modal-subtitle"></p>
+        <div class="bf-modal-actions bf-modal-actions-generate">
+          <button id="aiImageEditCancelBtn" type="button" class="bf-icon-only-btn" title="Close" aria-label="Close">
+            <i data-lucide="x"></i>
+          </button>
+          <button id="aiImageEditGenerateBtn" type="button" class="bf-icon-only-btn" title="Generate Edit" aria-label="Generate Edit">
+            <i data-lucide="send"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.4.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.4.0/dist/ionicons/ionicons.js"></script>
+    <script src="/editor.js"></script>
+  </body>
+</html>
