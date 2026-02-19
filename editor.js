@@ -6223,34 +6223,33 @@ function buildPageTurnPreviewHtml() {
       downloadPdfBtn.disabled = true;
       window.opener.postMessage({ type: "${PREVIEW_DOWNLOAD_PDF_MESSAGE}" }, window.location.origin);
     });
+    function resolveStablePreviewUrl() {
+      const currentHref = String(window.location.href || "").split("#")[0];
+      if (/^https?:\\/\\//i.test(currentHref)) {
+        return currentHref;
+      }
+      const hinted = String(shareUrlHint || "").trim();
+      if (/^https?:\\/\\//i.test(hinted)) {
+        return hinted;
+      }
+      return "";
+    }
     embedCodeBtn?.addEventListener("click", () => {
       if (embedCodeBtn.disabled) return;
-      const url = String(shareUrlHint || "").trim();
-      if (url) {
-        const code = '<iframe src="' + url + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
-        navigator.clipboard.writeText(code).then(() => {
-          alert("Embed code copied.");
-        }).catch(() => {
-          window.prompt("Copy embed code:", code);
-        });
+      const url = resolveStablePreviewUrl();
+      if (!url) {
+        alert("Embed code unavailable for this preview.");
         return;
       }
-      if (window.opener) {
-        embedCodeBtn.disabled = true;
-        window.opener.postMessage({ type: "${PREVIEW_COPY_EMBED_MESSAGE}" }, window.location.origin);
-        return;
-      }
-      alert("Embed code unavailable for this preview.");
+      const code = '<iframe src="' + url + '" style="width:100%;height:900px;border:0;" loading="lazy" title="MagX Embed"></iframe>';
+      navigator.clipboard.writeText(code).then(() => {
+        alert("Embed code copied.");
+      }).catch(() => {
+        window.prompt("Copy embed code:", code);
+      });
     });
     sharePreviewBtn?.addEventListener("click", () => {
-      const currentHref = String(window.location.href || "").split("#")[0];
-      const hasShareParam = /[?&]share=/.test(currentHref);
-      const url = hasShareParam ? currentHref : String(shareUrlHint || "").trim();
-      if (!url && window.opener) {
-        sharePreviewBtn.disabled = true;
-        window.opener.postMessage({ type: "${PREVIEW_COPY_PREVIEW_LINK_MESSAGE}" }, window.location.origin);
-        return;
-      }
+      const url = resolveStablePreviewUrl();
       if (!url) {
         alert("Preview link unavailable.");
         return;
@@ -6368,7 +6367,7 @@ function buildPageTurnPreviewHtml() {
     });
     window.addEventListener("resize", scheduleCenterBookInView);
     if (!window.opener && downloadPdfBtn) downloadPdfBtn.disabled = true;
-    if (!window.opener && embedCodeBtn) embedCodeBtn.disabled = !String(shareUrlHint || "").trim();
+    if (!window.opener && embedCodeBtn) embedCodeBtn.disabled = !resolveStablePreviewUrl();
 
     updateViewModeButton();
     renderSpread();
