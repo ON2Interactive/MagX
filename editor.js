@@ -2498,6 +2498,21 @@ async function createShareLink() {
   const payload = await buildSharePayload();
   const ownerId = getOrCreateClientOwnerId();
   const requestedShareId = createClientShareRequestId();
+  const initBody = await maybeCompressJsonForShare({ ownerId, requestedShareId });
+  const initResponse = await fetch("/api/share/init", {
+    method: "POST",
+    headers: initBody.headers,
+    body: initBody.body,
+  });
+  const initPayload = await initResponse.json().catch(() => ({}));
+  if (!initResponse.ok) {
+    throw new Error(initPayload?.error || "Could not initialize share.");
+  }
+  const shareId = String(initPayload?.id || requestedShareId || "").trim();
+  const shareUrlRaw = String(initPayload?.url || "").trim();
+  if (!shareId || !shareUrlRaw) {
+    throw new Error("Share initialization did not return a valid ID.");
+  }
   const imageRefs = [];
   (Array.isArray(payload.pages) ? payload.pages : []).forEach((page) => {
     const viewStates = page?.viewStates && typeof page.viewStates === "object" ? page.viewStates : {};
@@ -2521,7 +2536,7 @@ async function createShareLink() {
       const relativePath = `assets/${filename}`;
       setShareModalStatus(`Uploading assets ${uploaded + 1}/${imageRefs.length}...`);
       const uploadPayload = await maybeCompressJsonForShare({ dataUrl });
-      const uploadResponse = await fetch(`/api/share/${encodeURIComponent(requestedShareId)}/asset/${encodeURIComponent(relativePath)}`, {
+      const uploadResponse = await fetch(`/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`, {
         method: "POST",
         headers: uploadPayload.headers,
         body: uploadPayload.body,
@@ -2530,15 +2545,16 @@ async function createShareLink() {
       if (!uploadResponse.ok) {
         throw new Error(uploadBody?.error || "Could not upload image assets for sharing.");
       }
-      imageRef.src = String(uploadBody?.url || `/api/share/${encodeURIComponent(requestedShareId)}/asset/${encodeURIComponent(relativePath)}`);
+      imageRef.src = String(uploadBody?.url || `/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`);
       uploaded += 1;
     }
   }
-  const requestPayload = { project: payload, ownerId, requestedShareId };
+  setShareModalStatus("Saving preview project...");
+  const requestPayload = { project: payload, ownerId };
   const requestBody = await maybeCompressJsonForShare(requestPayload);
   let response;
   try {
-    response = await fetch("/api/share", {
+    response = await fetch(`/api/share/${encodeURIComponent(shareId)}/project`, {
       method: "POST",
       headers: requestBody.headers,
       body: requestBody.body,
@@ -2560,14 +2576,13 @@ async function createShareLink() {
     }
     throw new Error(body?.error || "Could not create share link.");
   }
-  const url = String(body?.url || "").trim();
+  const url = normalizeShareLinkInput(shareUrlRaw) || shareUrlRaw;
   if (!url) {
-    throw new Error("Server did not return a share URL.");
+    throw new Error("Share URL is unavailable.");
   }
-  const normalized = normalizeShareLinkInput(url) || url;
-  setShareLinkValue(normalized);
+  setShareLinkValue(url);
   setShareModalStatus("Share link ready.");
-  return normalized;
+  return url;
 }
 
 function normalizeShareLinkInput(value) {

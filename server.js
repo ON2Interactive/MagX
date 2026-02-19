@@ -416,6 +416,95 @@ function handleShareCreate(req, res) {
   });
 }
 
+async function handleShareInit(req, res) {
+  try {
+    const parsed = await parseJsonBody(req, { maxBytes: 512 * 1024 });
+    const ownerId =
+      normalizeOwnerId(parsed?.ownerId) ||
+      normalizeOwnerId(req.headers["x-magx-owner-id"]) ||
+      `usr_${createShareId()}`;
+    const requestedShareId = normalizeShareIdCandidate(parsed?.requestedShareId);
+    const id = requestedShareId || createShareId();
+    const createdAt = Date.now();
+
+    if (hasSupabaseShareBackend()) {
+      const metaBody = Buffer.from(
+        JSON.stringify({
+          shareId: id,
+          ownerId,
+          createdAt: new Date(createdAt).toISOString(),
+        }),
+        "utf8"
+      );
+      await supabaseStorageUpload(`shares/${id}/meta.json`, metaBody, "application/json; charset=utf-8");
+    } else {
+      shareStore[id] = shareStore[id] || { createdAt, ownerId, project: null };
+      shareStore[id].createdAt = createdAt;
+      shareStore[id].ownerId = ownerId;
+      pruneShareStore();
+      persistShareStore();
+    }
+
+    const origin = buildRequestOrigin(req);
+    const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+    return sendJson(res, 200, {
+      id,
+      ownerId,
+      url: shareUrl,
+      createdAt: new Date(createdAt).toISOString(),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error?.message || "Could not initialize share." });
+  }
+}
+
+async function handleShareProjectUpload(req, res, shareId) {
+  const id = String(shareId || "").trim();
+  if (!id) {
+    return sendJson(res, 400, { error: "Missing share id." });
+  }
+  try {
+    const parsed = await parseJsonBody(req, { maxBytes: 32 * 1024 * 1024 });
+    const project = parsed?.project || parsed;
+    const ownerId =
+      normalizeOwnerId(parsed?.ownerId) ||
+      normalizeOwnerId(req.headers["x-magx-owner-id"]) ||
+      `usr_${createShareId()}`;
+    const validation = validateSharedProjectPayload(project, {
+      skipSizeLimit: hasSupabaseShareBackend(),
+    });
+    if (!validation.ok) {
+      return sendJson(res, 400, { error: validation.error || "Invalid shared payload." });
+    }
+    const createdAt = Date.now();
+    if (hasSupabaseShareBackend()) {
+      const projectForStorage = await externalizeProjectImages(project, id);
+      const body = Buffer.from(JSON.stringify(projectForStorage), "utf8");
+      await supabaseStorageUpload(`shares/${id}/project.json`, body, "application/json; charset=utf-8");
+      const metaBody = Buffer.from(
+        JSON.stringify({
+          shareId: id,
+          ownerId,
+          createdAt: new Date(createdAt).toISOString(),
+        }),
+        "utf8"
+      );
+      await supabaseStorageUpload(`shares/${id}/meta.json`, metaBody, "application/json; charset=utf-8");
+    } else {
+      shareStore[id] = {
+        createdAt,
+        ownerId,
+        project,
+      };
+      pruneShareStore();
+      persistShareStore();
+    }
+    return sendJson(res, 200, { ok: true, id });
+  } catch (error) {
+    return sendJson(res, 400, { error: error?.message || "Could not upload share project." });
+  }
+}
+
 function handleShareGet(req, res, shareId) {
   const id = String(shareId || "").trim();
   if (!id) {
@@ -1201,6 +1290,11 @@ function requestHandler(req, res) {
     return;
   }
 
+  if (req.method === "POST" && pathname === "/api/share/init") {
+    handleShareInit(req, res);
+    return;
+  }
+
   if (req.method === "GET" && pathname.startsWith("/api/share/") && pathname.includes("/asset/")) {
     const match = pathname.match(/^\/api\/share\/([^/]+)\/asset\/(.+)$/);
     if (!match) {
@@ -1225,6 +1319,16 @@ function requestHandler(req, res) {
 
   if (req.method === "POST" && pathname === "/api/share") {
     handleShareCreate(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && pathname.startsWith("/api/share/") && pathname.endsWith("/project")) {
+    const match = pathname.match(/^\/api\/share\/([^/]+)\/project$/);
+    if (!match) {
+      return sendJson(res, 400, { error: "Invalid share project route." });
+    }
+    const shareId = decodeURIComponent(match[1]);
+    handleShareProjectUpload(req, res, shareId);
     return;
   }
 
