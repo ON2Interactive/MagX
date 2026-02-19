@@ -107,6 +107,13 @@ function createShareId() {
   return crypto.randomBytes(9).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function normalizeShareIdCandidate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!/^[A-Za-z0-9_-]{6,64}$/.test(raw)) return "";
+  return raw;
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -130,18 +137,27 @@ function decodeJwtPayload(token) {
   }
 }
 
-function parseJsonBody(req) {
+function parseJsonBody(req, options = {}) {
+  const maxBytes = Math.max(1024, Number(options.maxBytes) || 4 * 1024 * 1024);
   return new Promise((resolve, reject) => {
-    let raw = "";
+    const chunks = [];
+    let totalBytes = 0;
     req.on("data", (chunk) => {
-      raw += chunk;
-      if (raw.length > 4 * 1024 * 1024) {
+      chunks.push(chunk);
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
         reject(new Error("Request body too large."));
       }
     });
     req.on("end", () => {
       try {
-        resolve(JSON.parse(raw || "{}"));
+        const compressedBody = Buffer.concat(chunks);
+        let bodyBuffer = compressedBody;
+        const contentEncoding = String(req.headers["content-encoding"] || "").toLowerCase();
+        if (contentEncoding.includes("gzip")) {
+          bodyBuffer = zlib.gunzipSync(compressedBody);
+        }
+        resolve(JSON.parse(bodyBuffer.toString("utf8") || "{}"));
       } catch {
         reject(new Error("Invalid JSON body."));
       }
@@ -359,7 +375,8 @@ function handleShareCreate(req, res) {
         return sendJson(res, 400, { error: validation.error || "Invalid shared payload." });
       }
 
-      const id = createShareId();
+      const requestedShareId = normalizeShareIdCandidate(parsed?.requestedShareId);
+      const id = requestedShareId || createShareId();
       const createdAt = Date.now();
       if (hasSupabaseShareBackend()) {
         const projectForStorage = await externalizeProjectImages(project, id);
@@ -386,7 +403,7 @@ function handleShareCreate(req, res) {
       }
 
       const origin = buildRequestOrigin(req);
-      const shareUrl = `${origin}/preview?share=${encodeURIComponent(id)}`;
+      const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
       return sendJson(res, 200, {
         id,
         ownerId,
@@ -497,6 +514,40 @@ function handleShareAssetGet(req, res, shareId, relativeAssetPath) {
       res.end(error?.message || "Asset fetch failed");
     }
   })();
+}
+
+async function handleShareAssetUpload(req, res, shareId, relativeAssetPath) {
+  const id = String(shareId || "").trim();
+  const relativePath = String(relativeAssetPath || "").trim();
+  if (!hasSupabaseShareBackend()) {
+    return sendJson(res, 400, { error: "Supabase asset backend is not configured." });
+  }
+  if (!id || !relativePath) {
+    return sendJson(res, 400, { error: "Missing share asset path." });
+  }
+  if (relativePath.includes("..") || relativePath.startsWith("/")) {
+    return sendJson(res, 400, { error: "Invalid asset path." });
+  }
+  if (!relativePath.startsWith("assets/")) {
+    return sendJson(res, 400, { error: "Invalid asset path." });
+  }
+  try {
+    const body = await parseJsonBody(req, { maxBytes: 20 * 1024 * 1024 });
+    const dataUrl = String(body?.dataUrl || "").trim();
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed || !parsed.buffer || !parsed.buffer.length) {
+      return sendJson(res, 400, { error: "Invalid image payload." });
+    }
+    const storagePath = `shares/${id}/${relativePath}`;
+    await supabaseStorageUpload(storagePath, parsed.buffer, parsed.mimeType || "application/octet-stream");
+    return sendJson(res, 200, {
+      ok: true,
+      path: relativePath,
+      url: `/api/share/${encodeURIComponent(id)}/asset/${encodeURIComponent(relativePath)}`,
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error?.message || "Could not upload share asset." });
+  }
 }
 
 function normalizeEnvValue(value) {
@@ -1158,6 +1209,17 @@ function requestHandler(req, res) {
     const shareId = decodeURIComponent(match[1]);
     const relativePath = decodeURIComponent(match[2]);
     handleShareAssetGet(req, res, shareId, relativePath);
+    return;
+  }
+
+  if (req.method === "POST" && pathname.startsWith("/api/share/") && pathname.includes("/asset/")) {
+    const match = pathname.match(/^\/api\/share\/([^/]+)\/asset\/(.+)$/);
+    if (!match) {
+      return sendJson(res, 400, { error: "Invalid share asset route." });
+    }
+    const shareId = decodeURIComponent(match[1]);
+    const relativePath = decodeURIComponent(match[2]);
+    handleShareAssetUpload(req, res, shareId, relativePath);
     return;
   }
 

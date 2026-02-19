@@ -2342,6 +2342,17 @@ function getOrCreateClientOwnerId() {
   return generated;
 }
 
+function createClientShareRequestId() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID().replace(/-/g, "_");
+    }
+  } catch {
+    // Ignore and fallback.
+  }
+  return `shr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 async function maybeCompressJsonForShare(payloadObject) {
   const json = JSON.stringify(payloadObject || {});
   const headers = { "Content-Type": "application/json" };
@@ -2483,7 +2494,44 @@ async function createShareLink() {
   setShareModalStatus("Preparing share link...");
   const payload = await buildSharePayload();
   const ownerId = getOrCreateClientOwnerId();
-  const requestPayload = { project: payload, ownerId };
+  const requestedShareId = createClientShareRequestId();
+  const imageRefs = [];
+  (Array.isArray(payload.pages) ? payload.pages : []).forEach((page) => {
+    const viewStates = page?.viewStates && typeof page.viewStates === "object" ? page.viewStates : {};
+    ["desktop", "tablet", "mobile"].forEach((viewKey) => {
+      const elements = Array.isArray(viewStates?.[viewKey]?.elements) ? viewStates[viewKey].elements : [];
+      elements.forEach((item) => {
+        if (item?.type === "image" && typeof item.src === "string" && item.src.startsWith("data:image/")) {
+          imageRefs.push(item);
+        }
+      });
+    });
+  });
+  if (imageRefs.length > 0) {
+    let uploaded = 0;
+    for (const imageRef of imageRefs) {
+      const dataUrl = String(imageRef.src || "");
+      if (!dataUrl.startsWith("data:image/")) continue;
+      const mime = parseDataUrlMimeType(dataUrl);
+      const ext = extensionForMimeType(mime);
+      const filename = `${createClientShareRequestId()}.${ext}`;
+      const relativePath = `assets/${filename}`;
+      setShareModalStatus(`Uploading assets ${uploaded + 1}/${imageRefs.length}...`);
+      const uploadPayload = await maybeCompressJsonForShare({ dataUrl });
+      const uploadResponse = await fetch(`/api/share/${encodeURIComponent(requestedShareId)}/asset/${encodeURIComponent(relativePath)}`, {
+        method: "POST",
+        headers: uploadPayload.headers,
+        body: uploadPayload.body,
+      });
+      const uploadBody = await uploadResponse.json().catch(() => ({}));
+      if (!uploadResponse.ok) {
+        throw new Error(uploadBody?.error || "Could not upload image assets for sharing.");
+      }
+      imageRef.src = String(uploadBody?.url || `/api/share/${encodeURIComponent(requestedShareId)}/asset/${encodeURIComponent(relativePath)}`);
+      uploaded += 1;
+    }
+  }
+  const requestPayload = { project: payload, ownerId, requestedShareId };
   const requestBody = await maybeCompressJsonForShare(requestPayload);
   let response;
   try {
@@ -2526,12 +2574,12 @@ function normalizeShareLinkInput(value) {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/preview?share=${encodeURIComponent(id)}`;
+      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
     }
     if (raw.startsWith("/")) {
       const parsed = new URL(raw, window.location.origin);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/preview?share=${encodeURIComponent(id)}`;
+      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
     }
   } catch {
     return "";
@@ -2644,7 +2692,7 @@ async function loadSharedProjectFromUrlIfPresent() {
   const openPreviewOnLoad = onPreviewRoute || previewParam === "1" || previewParam === "true" || previewParam === "yes";
   if (!shareId) return false;
   await loadSharedProjectById(shareId);
-  const canonicalUrl = `${window.location.origin}/preview?share=${encodeURIComponent(shareId)}`;
+  const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}&preview=1`;
   setShareLinkValue(canonicalUrl);
   if (openPreviewOnLoad) {
     previewDesign({ sameTab: true });
@@ -5778,7 +5826,7 @@ function buildPageTurnPreviewHtml() {
   const currentShareId = String(currentUrlParams.get("share") || "").trim();
   const shareUrlHint =
     (currentShareId
-      ? `${window.location.origin}/preview?share=${encodeURIComponent(currentShareId)}`
+      ? `${window.location.origin}/editor?share=${encodeURIComponent(currentShareId)}&preview=1`
       : normalizeShareLinkInput(shareLinkField?.value || "")) || "";
   const pages = state.pages.map((page, index) => {
     const viewKey = page.currentView || "desktop";
@@ -6857,7 +6905,25 @@ function bindEvents() {
   if (groupBtn) groupBtn.addEventListener("click", () => runWithHistory(() => groupSelectedElements(), "group-elements"));
   if (ungroupBtn) ungroupBtn.addEventListener("click", () => runWithHistory(() => ungroupSelectedElements(), "group-elements"));
 
-  previewBtn.addEventListener("click", previewDesign);
+  previewBtn.addEventListener("click", async () => {
+    try {
+      if (previewBtn) previewBtn.disabled = true;
+      setStatus("Preparing preview...");
+      bindPreviewMessageListener();
+      const url = await createShareLink();
+      const previewWindow = window.open(url, "_blank");
+      if (previewWindow) {
+        activePreviewWindowRef = previewWindow;
+        setStatus("Preview opened.");
+      } else {
+        window.location.assign(url);
+      }
+    } catch (error) {
+      setStatus(error?.message || "Could not open preview.");
+    } finally {
+      if (previewBtn) previewBtn.disabled = false;
+    }
+  });
   if (copyHtmlBtn) {
     copyHtmlBtn.addEventListener("click", async () => {
       try {
