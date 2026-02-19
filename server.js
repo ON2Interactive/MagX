@@ -207,7 +207,8 @@ async function externalizeProjectImages(project, shareId) {
   return safeProject;
 }
 
-function validateSharedProjectPayload(project) {
+function validateSharedProjectPayload(project, options = {}) {
+  const skipSizeLimit = Boolean(options.skipSizeLimit);
   if (!project || typeof project !== "object" || Array.isArray(project)) {
     return { ok: false, error: "Invalid project payload." };
   }
@@ -220,7 +221,7 @@ function validateSharedProjectPayload(project) {
   } catch {
     return { ok: false, error: "Project payload is not serializable." };
   }
-  if (Buffer.byteLength(json, "utf8") > SHARE_PAYLOAD_MAX_BYTES) {
+  if (!skipSizeLimit && Buffer.byteLength(json, "utf8") > SHARE_PAYLOAD_MAX_BYTES) {
     return { ok: false, error: "Project payload is too large to share." };
   }
   return { ok: true };
@@ -240,7 +241,9 @@ function pruneShareStore() {
 function handleShareCreate(req, res) {
   let raw = "";
   let exceedsHardLimit = false;
-  const hardLimitBytes = SHARE_PAYLOAD_MAX_BYTES + 2 * 1024 * 1024;
+  const hardLimitBytes = hasSupabaseShareBackend()
+    ? 120 * 1024 * 1024
+    : SHARE_PAYLOAD_MAX_BYTES + 2 * 1024 * 1024;
   req.on("data", (chunk) => {
     if (exceedsHardLimit) return;
     raw += chunk;
@@ -261,7 +264,9 @@ function handleShareCreate(req, res) {
         normalizeOwnerId(parsed?.ownerId) ||
         normalizeOwnerId(req.headers["x-magx-owner-id"]) ||
         `usr_${createShareId()}`;
-      const validation = validateSharedProjectPayload(project);
+      const validation = validateSharedProjectPayload(project, {
+        skipSizeLimit: hasSupabaseShareBackend(),
+      });
       if (!validation.ok) {
         return sendJson(res, 400, { error: validation.error || "Invalid shared payload." });
       }
