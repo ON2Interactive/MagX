@@ -125,6 +125,13 @@ function buildRequestOrigin(req) {
   return `${proto}://${hostHeader}`;
 }
 
+function buildPersistentPreviewUrl(origin, shareId) {
+  const safeOrigin = normalizeAbsoluteOrigin(origin) || "";
+  const safeShareId = normalizeShareIdCandidate(shareId);
+  if (!safeOrigin || !safeShareId) return "";
+  return `${safeOrigin}/preview/${encodeURIComponent(safeShareId)}`;
+}
+
 function createShareId() {
   return crypto.randomBytes(9).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
@@ -425,7 +432,7 @@ function handleShareCreate(req, res) {
       }
 
       const origin = buildRequestOrigin(req);
-      const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+      const shareUrl = buildPersistentPreviewUrl(origin, id) || `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
       return sendJson(res, 200, {
         id,
         ownerId,
@@ -468,7 +475,7 @@ async function handleShareInit(req, res) {
     }
 
     const origin = buildRequestOrigin(req);
-    const shareUrl = `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
+    const shareUrl = buildPersistentPreviewUrl(origin, id) || `${origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
     return sendJson(res, 200, {
       id,
       ownerId,
@@ -1246,10 +1253,11 @@ async function handleLayoutGenerate(req, res) {
 function serveStatic(req, res) {
   const rawPath = decodeURIComponent(req.url.split("?")[0] || "/");
   const isUuidSharePath = /^\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(rawPath);
+  const isPreviewSharePath = /^\/preview\/([A-Za-z0-9_-]{6,64})$/.test(rawPath);
   let reqPath =
     rawPath === "/"
       ? "/index.html"
-      : rawPath === "/magx" || rawPath === "/editor" || isUuidSharePath
+      : rawPath === "/magx" || rawPath === "/editor" || isUuidSharePath || isPreviewSharePath
         ? "/editor.html"
         : rawPath === "/preview"
           ? "/preview.html"
@@ -1290,9 +1298,29 @@ function requestHandler(req, res) {
   const legacyUuidPathMatch = String(pathname || "").match(
     /^\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/
   );
+  const previewSharePathMatch = String(pathname || "").match(/^\/preview\/([A-Za-z0-9_-]{6,64})$/);
 
   if (req.method === "GET" && legacyUuidPathMatch?.[1]) {
     const shareId = legacyUuidPathMatch[1];
+    const location = `/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+    res.writeHead(302, {
+      Location: location,
+      "Cache-Control": "no-store",
+    });
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET" && previewSharePathMatch?.[1]) {
+    const shareId = normalizeShareIdCandidate(previewSharePathMatch[1]);
+    if (!shareId) {
+      res.writeHead(302, {
+        Location: "/",
+        "Cache-Control": "no-store",
+      });
+      res.end();
+      return;
+    }
     const location = `/editor?share=${encodeURIComponent(shareId)}&preview=1`;
     res.writeHead(302, {
       Location: location,

@@ -44,6 +44,14 @@
       "dest": "/editor.html"
     },
     {
+      "src": "/preview/([A-Za-z0-9_-]{6,64})",
+      "dest": "/editor.html?share=$1&preview=1"
+    },
+    {
+      "src": "/([A-Za-z0-9_-]{12})",
+      "dest": "/editor.html?share=$1&preview=1"
+    },
+    {
       "src": "/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
       "dest": "/editor.html?share=$1&preview=1"
     },

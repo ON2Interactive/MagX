@@ -2614,21 +2614,29 @@ async function createShareLink() {
 function normalizeShareLinkInput(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const uuidPathPattern = /^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
+  const shareIdPattern = /^([A-Za-z0-9_-]{6,64}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
+  const extractShareIdFromPath = (pathname) => {
+    const directMatch = String(pathname || "").match(/^\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+    if (directMatch?.[1] && shareIdPattern.test(directMatch[1])) return directMatch[1];
+    const previewMatch = String(pathname || "").match(/^\/preview\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+    if (previewMatch?.[1] && shareIdPattern.test(previewMatch[1])) return previewMatch[1];
+    return "";
+  };
+  const toPreviewUrl = (origin, shareId) => `${origin}/preview/${encodeURIComponent(shareId)}`;
   try {
     if (/^https?:\/\//i.test(raw)) {
       const parsed = new URL(raw);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
-      const pathMatch = String(parsed.pathname || "").match(uuidPathPattern);
-      if (pathMatch?.[1]) return `${parsed.origin}/editor?share=${encodeURIComponent(pathMatch[1])}&preview=1`;
+      if (id && shareIdPattern.test(id)) return toPreviewUrl(parsed.origin, id);
+      const pathId = extractShareIdFromPath(parsed.pathname || "");
+      if (pathId) return toPreviewUrl(parsed.origin, pathId);
     }
     if (raw.startsWith("/")) {
       const parsed = new URL(raw, window.location.origin);
       const id = String(parsed.searchParams.get("share") || "").trim();
-      if (id) return `${parsed.origin}/editor?share=${encodeURIComponent(id)}&preview=1`;
-      const pathMatch = String(parsed.pathname || "").match(uuidPathPattern);
-      if (pathMatch?.[1]) return `${parsed.origin}/editor?share=${encodeURIComponent(pathMatch[1])}&preview=1`;
+      if (id && shareIdPattern.test(id)) return toPreviewUrl(parsed.origin, id);
+      const pathId = extractShareIdFromPath(parsed.pathname || "");
+      if (pathId) return toPreviewUrl(parsed.origin, pathId);
     }
   } catch {
     return "";
@@ -2735,11 +2743,12 @@ async function loadSharedProjectById(shareId) {
 
 async function loadSharedProjectFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
-  const legacyPathShareMatch = String(window.location.pathname || "")
-    .match(/^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
-  const shareId = String(params.get("share") || legacyPathShareMatch?.[1] || "").trim();
+  const pathname = String(window.location.pathname || "");
+  const legacyPathShareMatch = pathname.match(/^\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+  const previewPathShareMatch = pathname.match(/^\/preview\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+  const shareId = String(params.get("share") || previewPathShareMatch?.[1] || legacyPathShareMatch?.[1] || "").trim();
   const previewParam = String(params.get("preview") || "").trim().toLowerCase();
-  const onPreviewRoute = String(window.location.pathname || "").toLowerCase() === "/preview";
+  const onPreviewRoute = pathname.toLowerCase() === "/preview" || Boolean(previewPathShareMatch?.[1]);
   const openPreviewOnLoad =
     onPreviewRoute ||
     Boolean(legacyPathShareMatch?.[1]) ||
@@ -2748,7 +2757,7 @@ async function loadSharedProjectFromUrlIfPresent() {
     previewParam === "yes";
   if (!shareId) return false;
   await loadSharedProjectById(shareId);
-  const canonicalUrl = `${window.location.origin}/editor?share=${encodeURIComponent(shareId)}&preview=1`;
+  const canonicalUrl = `${window.location.origin}/preview/${encodeURIComponent(shareId)}`;
   window.history.replaceState({}, "", canonicalUrl);
   setShareLinkValue(canonicalUrl);
   if (openPreviewOnLoad) {
@@ -5910,12 +5919,13 @@ function buildPageTurnPreviewHtml() {
   persistCurrentPageState();
   ensureInheritedViewsUpToDate();
   const currentUrlParams = new URLSearchParams(window.location.search);
-  const pathShareIdMatch = String(window.location.pathname || "")
-    .match(/^\/([A-Za-z0-9_-]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
-  const currentShareId = String(currentUrlParams.get("share") || pathShareIdMatch?.[1] || "").trim();
+  const pathname = String(window.location.pathname || "");
+  const pathShareIdMatch = pathname.match(/^\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+  const previewPathShareIdMatch = pathname.match(/^\/preview\/([A-Za-z0-9_-]{6,64}|[0-9a-fA-F-]{36})$/);
+  const currentShareId = String(currentUrlParams.get("share") || previewPathShareIdMatch?.[1] || pathShareIdMatch?.[1] || "").trim();
   const shareUrlHint =
     (currentShareId
-      ? `${window.location.origin}/editor?share=${encodeURIComponent(currentShareId)}&preview=1`
+      ? `${window.location.origin}/preview/${encodeURIComponent(currentShareId)}`
       : normalizeShareLinkInput(shareLinkField?.value || "")) || "";
   const pages = state.pages.map((page, index) => {
     const viewKey = page.currentView || "desktop";
