@@ -5213,10 +5213,24 @@ function buildLayerHtml(viewState, options = {}) {
   const resolvePreviewImageSrc = (srcValue) => {
     const raw = String(srcValue || "").trim();
     if (!raw) return raw;
-    if (!baseOrigin) return raw;
-    if (!raw.startsWith("/api/share/")) return raw;
+    const isShareAssetPath = raw.includes("/api/share/") && raw.includes("/asset/");
+    if (!isShareAssetPath) return raw;
     try {
-      return new URL(raw, baseOrigin).toString();
+      const parsed = /^https?:\/\//i.test(raw)
+        ? new URL(raw)
+        : new URL(raw, baseOrigin || window.location.origin);
+      const match = String(parsed.pathname || "").match(/^\/api\/share\/([^/]+)\/asset\/(.+)$/);
+      if (!match) return parsed.toString();
+      const shareId = match[1];
+      let relativePath = match[2];
+      // Handle legacy/double-encoded share asset paths defensively.
+      for (let i = 0; i < 3; i += 1) {
+        const decoded = decodeURIComponent(relativePath);
+        if (decoded === relativePath) break;
+        relativePath = decoded;
+      }
+      parsed.pathname = `/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`;
+      return parsed.toString();
     } catch {
       return raw;
     }
@@ -5266,13 +5280,16 @@ function buildLayerHtml(viewState, options = {}) {
             textMode === "gradient"
               ? `color:transparent;background-image:${escapeHtml(buildGradientCss(item.textGradientFrom, item.textGradientTo, item.textGradientAngle))};background-clip:text;-webkit-background-clip:text;`
               : textMode === "image" && item.textFillImageSrc
-                ? `color:transparent;background-image:url(${escapeHtml(item.textFillImageSrc)});background-size:${getTextImageScale(item)}% auto;background-position:${getTextImageX(item)}% ${getTextImageY(item)}%;background-repeat:no-repeat;background-clip:text;-webkit-background-clip:text;`
+                ? `color:transparent;background-image:url(${escapeHtml(resolvePreviewImageSrc(item.textFillImageSrc))});background-size:${getTextImageScale(item)}% auto;background-position:${getTextImageX(item)}% ${getTextImageY(item)}%;background-repeat:no-repeat;background-clip:text;-webkit-background-clip:text;`
                 : `color:${escapeHtml(item.textColor)};`;
         return `<div style="${commonStyle};${textFillStyle}font:${normalizeFontWeight(item.fontWeight ?? 600)} ${effectiveFontSize}px ${escapeHtml(item.fontFamily)};white-space:pre-wrap;line-height:${lineHeight};word-spacing:${wordSpacing}px;letter-spacing:${tracking}px;text-decoration:${decoration};text-align:${textAlign};text-transform:${textCase === "uppercase" ? "uppercase" : "none"};font-variant-caps:${textCase === "small-caps" ? "small-caps" : "normal"};position:absolute;translate:0 ${scriptOffset}px;">${escapeHtml(getRenderedTextContent(item))}</div>`;
       }
 
       if (item.type === "shape") {
-        const fillCss = escapeHtml(getShapeFillCss(item));
+        const shapeForPreview = item.shapeFillImageSrc
+          ? { ...item, shapeFillImageSrc: resolvePreviewImageSrc(item.shapeFillImageSrc) }
+          : item;
+        const fillCss = escapeHtml(getShapeFillCss(shapeForPreview));
         const radius = item.shapeKind === "circle" ? "50%" : `${item.radius}px`;
         const borders = getBorderWidths(item);
         if (item.shapeKind === "triangle") {
