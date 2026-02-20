@@ -5183,6 +5183,18 @@ function escapeHtml(value) {
 function buildLayerHtml(viewState, options = {}) {
   const canvasWidth = Math.max(1, Number(viewState?.canvas?.width) || 1);
   const enableFullBleed = Boolean(options.enableFullBleed);
+  const baseOrigin = String(options.baseOrigin || "").trim();
+  const resolvePreviewImageSrc = (srcValue) => {
+    const raw = String(srcValue || "").trim();
+    if (!raw) return raw;
+    if (!baseOrigin) return raw;
+    if (!raw.startsWith("/api/share/")) return raw;
+    try {
+      return new URL(raw, baseOrigin).toString();
+    } catch {
+      return raw;
+    }
+  };
   return [...viewState.elements]
     .sort((a, b) => a.z - b.z)
     .map((item) => {
@@ -5257,7 +5269,8 @@ function buildLayerHtml(viewState, options = {}) {
         const focalX = clamp(Number(item.focalX ?? 50), 0, 100);
         const focalY = clamp(Number(item.focalY ?? 50), 0, 100);
         const filter = escapeHtml(buildImageFilterCss(item));
-        return `<img alt="Layer image" src="${item.src}" style="${commonStyle};object-fit:${fit};object-position:${focalX}% ${focalY}%;filter:${filter};display:block;"/>`;
+        const resolvedSrc = resolvePreviewImageSrc(item.src);
+        return `<img alt="Layer image" src="${escapeHtml(resolvedSrc)}" style="${commonStyle};object-fit:${fit};object-position:${focalX}% ${focalY}%;filter:${filter};display:block;"/>`;
       }
 
       if (item.type === "icon") {
@@ -5872,7 +5885,7 @@ function buildPageTurnPreviewHtml() {
         height: Math.max(1, Number(viewState.canvas?.height) || 1),
         background: viewState.canvas?.background || "#f6f7fb",
       },
-      layerHtml: buildLayerHtml(viewState, { enableFullBleed: true }),
+      layerHtml: buildLayerHtml(viewState, { enableFullBleed: true, baseOrigin: window.location.origin }),
     };
   });
   const maxWidth = Math.max(...pages.map((page) => page.canvas.width), 1);
@@ -6228,11 +6241,11 @@ function buildPageTurnPreviewHtml() {
       // or a stable https:// URL (from a shared link).
       const currentHref = String(window.location.href || "").split("#")[0];
       // We check for http/https to determine if this is a "stable" (shareable) URL.
-      if (/^https?:\/\//i.test(currentHref) && !currentHref.startsWith("blob:")) {
+      if ((currentHref.startsWith("http://") || currentHref.startsWith("https://")) && !currentHref.startsWith("blob:")) {
         return currentHref;
       }
       const hinted = String(shareUrlHint || "").trim();
-      if (/^https?:\/\//i.test(hinted)) {
+      if (hinted.startsWith("http://") || hinted.startsWith("https://")) {
         return hinted;
       }
       return "";
