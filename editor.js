@@ -2493,9 +2493,69 @@ async function buildSharePayload() {
   return payload;
 }
 
+async function externalizeInlineShareImages(payload, shareId) {
+  const dataUrlCache = new Map();
+  let uploadedCount = 0;
+
+  const uploadDataUrl = async (dataUrl) => {
+    const key = String(dataUrl || "");
+    if (!key.startsWith("data:image/")) return key;
+    if (dataUrlCache.has(key)) return dataUrlCache.get(key);
+    const mime = parseDataUrlMimeType(key);
+    const ext = extensionForMimeType(mime);
+    const filename = `${createClientShareRequestId()}.${ext}`;
+    const relativePath = `assets/${filename}`;
+    setShareModalStatus(`Uploading assets ${uploadedCount + 1}...`);
+    const uploadPayload = await maybeCompressJsonForShare({ dataUrl: key });
+    const uploadResponse = await fetch(`/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`, {
+      method: "POST",
+      headers: uploadPayload.headers,
+      body: uploadPayload.body,
+    });
+    const uploadBody = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) {
+      throw new Error(uploadBody?.error || "Could not upload image assets for sharing.");
+    }
+    const uploadedUrl = String(uploadBody?.url || `/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`);
+    dataUrlCache.set(key, uploadedUrl);
+    uploadedCount += 1;
+    return uploadedUrl;
+  };
+
+  const visit = async (value) => {
+    if (typeof value === "string") {
+      if (value.startsWith("data:image/")) {
+        return uploadDataUrl(value);
+      }
+      return value;
+    }
+    if (Array.isArray(value)) {
+      const next = [];
+      for (const entry of value) {
+        next.push(await visit(entry));
+      }
+      return next;
+    }
+    if (value && typeof value === "object") {
+      const next = {};
+      for (const [key, entry] of Object.entries(value)) {
+        next[key] = await visit(entry);
+      }
+      return next;
+    }
+    return value;
+  };
+
+  const nextPayload = await visit(payload);
+  return {
+    payload: nextPayload,
+    uploadedCount,
+  };
+}
+
 async function createShareLink() {
   setShareModalStatus("Preparing share link...");
-  const payload = await buildSharePayload();
+  let payload = await buildSharePayload();
   const ownerId = getOrCreateClientOwnerId();
   const requestedShareId = createClientShareRequestId();
   const initBody = await maybeCompressJsonForShare({ ownerId, requestedShareId });
@@ -2513,42 +2573,8 @@ async function createShareLink() {
   if (!shareId || !shareUrlRaw) {
     throw new Error("Share initialization did not return a valid ID.");
   }
-  const imageRefs = [];
-  (Array.isArray(payload.pages) ? payload.pages : []).forEach((page) => {
-    const viewStates = page?.viewStates && typeof page.viewStates === "object" ? page.viewStates : {};
-    ["desktop", "tablet", "mobile"].forEach((viewKey) => {
-      const elements = Array.isArray(viewStates?.[viewKey]?.elements) ? viewStates[viewKey].elements : [];
-      elements.forEach((item) => {
-        if (item?.type === "image" && typeof item.src === "string" && item.src.startsWith("data:image/")) {
-          imageRefs.push(item);
-        }
-      });
-    });
-  });
-  if (imageRefs.length > 0) {
-    let uploaded = 0;
-    for (const imageRef of imageRefs) {
-      const dataUrl = String(imageRef.src || "");
-      if (!dataUrl.startsWith("data:image/")) continue;
-      const mime = parseDataUrlMimeType(dataUrl);
-      const ext = extensionForMimeType(mime);
-      const filename = `${createClientShareRequestId()}.${ext}`;
-      const relativePath = `assets/${filename}`;
-      setShareModalStatus(`Uploading assets ${uploaded + 1}/${imageRefs.length}...`);
-      const uploadPayload = await maybeCompressJsonForShare({ dataUrl });
-      const uploadResponse = await fetch(`/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`, {
-        method: "POST",
-        headers: uploadPayload.headers,
-        body: uploadPayload.body,
-      });
-      const uploadBody = await uploadResponse.json().catch(() => ({}));
-      if (!uploadResponse.ok) {
-        throw new Error(uploadBody?.error || "Could not upload image assets for sharing.");
-      }
-      imageRef.src = String(uploadBody?.url || `/api/share/${encodeURIComponent(shareId)}/asset/${encodeURIComponent(relativePath)}`);
-      uploaded += 1;
-    }
-  }
+  const externalized = await externalizeInlineShareImages(payload, shareId);
+  payload = externalized.payload;
   setShareModalStatus("Saving preview project...");
   const requestPayload = { project: payload, ownerId };
   const requestBody = await maybeCompressJsonForShare(requestPayload);
